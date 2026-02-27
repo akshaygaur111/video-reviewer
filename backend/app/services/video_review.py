@@ -20,17 +20,20 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional
 
 from bson import ObjectId
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 from app.database import get_db
 from app.services.drive import download_from_drive
+
+
+MODEL_NAME = "gemini-2.0-flash"
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def extract_json(text: str) -> List[Dict]:
     """Extract a JSON array from Gemini's response (handles markdown code fences)."""
-    # Strip markdown fences
     fence = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text)
     if fence:
         try:
@@ -38,7 +41,6 @@ def extract_json(text: str) -> List[Dict]:
         except Exception:
             pass
 
-    # Bare JSON array
     arr = re.search(r"\[[\s\S]*\]", text)
     if arr:
         try:
@@ -148,29 +150,28 @@ def _combine_issues(passes: List[Dict]) -> List[Dict]:
 # ── Core review logic ─────────────────────────────────────────────────────────
 
 async def _run_pass(
+    client: genai.Client,
     video_file,
     pass_number: int,
     rigor: str,
     transcript: str,
-    model_name: str,
 ) -> Dict:
     temperature = {"standard": 0.10, "enhanced": 0.05, "maximum": 0.01}[rigor]
-    model = genai.GenerativeModel(
-        model_name=model_name,
-        generation_config={
-            "temperature": temperature,
-            "top_p": 0.95,
-            "max_output_tokens": 8192,
-        },
-    )
     prompt = _rigor_prompt(rigor, transcript)
     loop = asyncio.get_running_loop()
 
+    config = types.GenerateContentConfig(
+        temperature=temperature,
+        top_p=0.95,
+        max_output_tokens=8192,
+    )
+
     response = await loop.run_in_executor(
         None,
-        lambda: model.generate_content(
-            [video_file, prompt],
-            request_options={"timeout": 600},
+        lambda: client.models.generate_content(
+            model=MODEL_NAME,
+            contents=[video_file, prompt],
+            config=config,
         ),
     )
     issues = extract_json(response.text)
@@ -191,6 +192,7 @@ async def _process_single_video(
     db = get_db()
     video_path = None
     video_file = None
+    client = None
 
     # Mark as processing
     await db.jobs.update_one(
@@ -204,8 +206,7 @@ async def _process_single_video(
     )
 
     try:
-        genai.configure(api_key=api_key)
-        model_name = "gemini-2.0-flash"
+        client = genai.Client(api_key=api_key)
         loop = asyncio.get_running_loop()
 
         # ── 1. Download ──────────────────────────────────────────────────────
@@ -215,14 +216,15 @@ async def _process_single_video(
         # ── 2. Upload to Gemini ──────────────────────────────────────────────
         print(f"[Job {job_id}] Video {video_index}: uploading to Gemini...")
         video_file = await loop.run_in_executor(
-            None, lambda: genai.upload_file(path=video_path)
+            None, lambda: client.files.upload(file=video_path)
         )
 
         # Wait for Gemini to finish processing
         while video_file.state.name == "PROCESSING":
             await asyncio.sleep(3)
+            file_name = video_file.name
             video_file = await loop.run_in_executor(
-                None, lambda: genai.get_file(video_file.name)
+                None, lambda: client.files.get(name=file_name)
             )
 
         if video_file.state.name == "FAILED":
@@ -230,12 +232,12 @@ async def _process_single_video(
 
         # ── 3. Extract transcript ────────────────────────────────────────────
         print(f"[Job {job_id}] Video {video_index}: extracting transcript...")
-        t_model = genai.GenerativeModel(model_name)
         t_response = await loop.run_in_executor(
             None,
-            lambda: t_model.generate_content(
-                [video_file, "Provide a verbatim transcript with timestamps for every sentence."],
-                request_options={"timeout": 300},
+            lambda: client.models.generate_content(
+                model=MODEL_NAME,
+                contents=[video_file, "Provide a verbatim transcript with timestamps for every sentence."],
+                config=types.GenerateContentConfig(max_output_tokens=8192),
             ),
         )
         transcript = t_response.text
@@ -253,7 +255,7 @@ async def _process_single_video(
             print(
                 f"[Job {job_id}] Video {video_index}: Pass {pass_num} ({rigor})..."
             )
-            result = await _run_pass(video_file, pass_num, rigor, transcript, model_name)
+            result = await _run_pass(client, video_file, pass_num, rigor, transcript)
             passes.append(result)
 
             # Stream pass result into DB so UI can show progress
@@ -300,10 +302,11 @@ async def _process_single_video(
         )
     finally:
         # Always clean up
-        if video_file:
+        if video_file and client:
             try:
+                file_name = video_file.name
                 loop = asyncio.get_running_loop()
-                await loop.run_in_executor(None, lambda: genai.delete_file(video_file.name))
+                await loop.run_in_executor(None, lambda: client.files.delete(name=file_name))
             except Exception:
                 pass
         if video_path and os.path.exists(video_path):
