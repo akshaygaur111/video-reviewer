@@ -121,7 +121,11 @@ export default function JobDetail() {
             <h1 className="text-lg font-bold text-white truncate">Job #{job.id?.slice(-8)}</h1>
           </div>
           <p className="text-xs text-slate-500">
-            Submitted {new Date(job.created_at).toLocaleString()}
+            Submitted {new Date(job.created_at).toLocaleString('en-IN', {
+              timeZone: 'Asia/Kolkata',
+              day: '2-digit', month: 'short', year: 'numeric',
+              hour: '2-digit', minute: '2-digit', hour12: true,
+            })} IST
           </p>
         </div>
         <button onClick={fetch} className="btn-ghost !px-2.5 !py-2" title="Refresh">

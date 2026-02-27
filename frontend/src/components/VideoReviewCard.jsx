@@ -105,13 +105,20 @@ export default function VideoReviewCard({ video, globalIndex }) {
           {video.status === 'completed' && (
             <div>
               <div className="flex items-center justify-between mb-3">
-                <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                  Combined Issues
-                </h4>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    Combined Issues
+                  </h4>
+                  {hasIssues && (
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/30">
+                      {video.total_issues}
+                    </span>
+                  )}
+                </div>
                 {!hasIssues && (
-                  <span className="flex items-center gap-1 text-xs text-emerald-400">
+                  <span className="flex items-center gap-1 text-xs text-emerald-400 font-medium">
                     <CheckCircle2 size={12} />
-                    Clean pass!
+                    All clear
                   </span>
                 )}
               </div>
@@ -124,9 +131,9 @@ export default function VideoReviewCard({ video, globalIndex }) {
                 </div>
               ) : (
                 <div className="text-center py-6">
-                  <div className="text-4xl mb-2">🎉</div>
+                  <div className="text-3xl mb-2">✅</div>
                   <p className="text-sm text-emerald-400 font-medium">Zero issues detected</p>
-                  <p className="text-xs text-slate-500 mt-1">Standard → Enhanced → Maximum — all 3 passes clean</p>
+                  <p className="text-xs text-slate-500 mt-1">Initial Scan → Deep Dive → Final Check — all 3 passes clean</p>
                 </div>
               )}
             </div>
