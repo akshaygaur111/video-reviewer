@@ -1,0 +1,250 @@
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { reviewsAPI } from '../api/client'
+import { useAuth } from '../contexts/AuthContext'
+import StatusBadge from '../components/StatusBadge'
+import {
+  Plus, Trash2, Send, Film, Clock, CheckCircle, AlertTriangle,
+  ChevronRight, Loader, Video
+} from 'lucide-react'
+import toast from 'react-hot-toast'
+
+function StatCard({ icon: Icon, label, value, color, bg }) {
+  return (
+    <div className="glass p-5 flex items-center gap-4">
+      <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${bg}`}>
+        <Icon size={20} className={color} />
+      </div>
+      <div>
+        <p className="text-2xl font-bold text-white">{value}</p>
+        <p className="text-xs text-slate-500 font-medium">{label}</p>
+      </div>
+    </div>
+  )
+}
+
+function JobRow({ job, onClick }) {
+  const isActive = job.status === 'processing' || job.status === 'pending'
+  return (
+    <button
+      onClick={onClick}
+      className="glass-hover w-full flex items-center gap-4 p-4 rounded-xl text-left transition-all"
+    >
+      {/* Icon */}
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+        job.status === 'completed' ? 'bg-emerald-500/15' :
+        job.status === 'failed'    ? 'bg-red-500/15'     :
+        job.status === 'processing'? 'bg-amber-500/15'   : 'bg-slate-700/40'
+      }`}>
+        {isActive
+          ? <Loader size={18} className="text-amber-400 animate-spin" />
+          : job.status === 'completed'
+          ? <CheckCircle size={18} className="text-emerald-400" />
+          : job.status === 'failed'
+          ? <AlertTriangle size={18} className="text-red-400" />
+          : <Clock size={18} className="text-slate-400" />
+        }
+      </div>
+
+      {/* Info */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-0.5">
+          <span className="text-sm font-semibold text-slate-200 truncate">
+            Job #{job.id?.slice(-8)}
+          </span>
+          <StatusBadge status={job.status} size="sm" />
+        </div>
+        <div className="flex items-center gap-3 text-xs text-slate-500">
+          <span>{job.total_videos} video{job.total_videos !== 1 ? 's' : ''}</span>
+          <span>•</span>
+          <span>{new Date(job.created_at).toLocaleDateString()} {new Date(job.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+          {job.status === 'completed' && (
+            <>
+              <span>•</span>
+              <span className={job.total_issues > 0 ? 'text-red-400' : 'text-emerald-400'}>
+                {job.total_issues} issue{job.total_issues !== 1 ? 's' : ''}
+              </span>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Progress for active jobs */}
+      {isActive && (
+        <div className="hidden sm:block w-24">
+          <div className="text-xs text-slate-500 mb-1 text-right">
+            {job.completed_videos}/{job.total_videos}
+          </div>
+          <div className="h-1.5 bg-dark-600 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-amber-500 rounded-full transition-all duration-500"
+              style={{ width: `${job.total_videos > 0 ? (job.completed_videos / job.total_videos) * 100 : 0}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      <ChevronRight size={16} className="text-slate-600 shrink-0" />
+    </button>
+  )
+}
+
+export default function Dashboard() {
+  const { user }  = useAuth()
+  const navigate  = useNavigate()
+
+  const [jobs, setJobs]         = useState([])
+  const [loading, setLoading]   = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [links, setLinks]       = useState([''])
+  const intervalRef             = useRef(null)
+
+  const fetchJobs = useCallback(async () => {
+    try {
+      const res = await reviewsAPI.list()
+      setJobs(res.data)
+    } catch (_) {}
+    finally { setLoading(false) }
+  }, [])
+
+  // Poll when any job is active
+  useEffect(() => {
+    fetchJobs()
+  }, [fetchJobs])
+
+  useEffect(() => {
+    const hasActive = jobs.some(j => j.status === 'processing' || j.status === 'pending')
+    if (hasActive) {
+      intervalRef.current = setInterval(fetchJobs, 4000)
+    } else {
+      clearInterval(intervalRef.current)
+    }
+    return () => clearInterval(intervalRef.current)
+  }, [jobs, fetchJobs])
+
+  const addLink  = () => setLinks([...links, ''])
+  const rmLink   = (i) => setLinks(links.filter((_, idx) => idx !== i))
+  const setLink  = (i, v) => setLinks(links.map((l, idx) => idx === i ? v : l))
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    const clean = links.map(l => l.trim()).filter(Boolean)
+    if (!clean.length) { toast.error('Add at least one Drive link'); return }
+    setSubmitting(true)
+    try {
+      const res = await reviewsAPI.create({ drive_links: clean })
+      toast.success(`Review job started for ${clean.length} video${clean.length !== 1 ? 's' : ''}!`)
+      setLinks([''])
+      await fetchJobs()
+      navigate(`/jobs/${res.data.job_id}`)
+    } catch (err) {
+      toast.error(err.response?.data?.detail ?? 'Failed to start review')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // Stats
+  const total      = jobs.length
+  const active     = jobs.filter(j => j.status === 'processing' || j.status === 'pending').length
+  const completed  = jobs.filter(j => j.status === 'completed').length
+  const allIssues  = jobs.reduce((s, j) => s + (j.total_issues ?? 0), 0)
+
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
+      {/* Header */}
+      <div className="animate-slide-up">
+        <h1 className="text-3xl font-black text-white mb-1">
+          Hey, <span className="grad-text">{user?.username}</span> 👋
+        </h1>
+        <p className="text-slate-500">Submit Google Drive video links for AI-powered QA review.</p>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 animate-slide-up" style={{ animationDelay: '60ms' }}>
+        <StatCard icon={Film}         label="Total Jobs"   value={total}     color="text-purple-400" bg="bg-purple-500/15" />
+        <StatCard icon={Loader}       label="Processing"   value={active}    color="text-amber-400"  bg="bg-amber-500/15" />
+        <StatCard icon={CheckCircle}  label="Completed"    value={completed} color="text-emerald-400" bg="bg-emerald-500/15" />
+        <StatCard icon={AlertTriangle} label="Issues Found" value={allIssues} color="text-red-400"   bg="bg-red-500/15" />
+      </div>
+
+      {/* Submit form */}
+      <div className="glass p-6 animate-slide-up" style={{ animationDelay: '120ms' }}>
+        <div className="flex items-center gap-2 mb-5">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg,#7c3aed,#06b6d4)' }}>
+            <Video size={16} className="text-white" />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-white">New Review Job</h2>
+            <p className="text-xs text-slate-500">Paste Google Drive share links (up to 50)</p>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-3">
+          {links.map((link, i) => (
+            <div key={i} className="flex gap-2">
+              <input
+                type="url"
+                value={link}
+                onChange={e => setLink(i, e.target.value)}
+                placeholder={`https://drive.google.com/file/d/…/view  (video ${i + 1})`}
+                className="input flex-1 font-mono text-xs"
+              />
+              {links.length > 1 && (
+                <button type="button" onClick={() => rmLink(i)}
+                  className="btn-ghost !px-2.5 text-red-400 hover:text-red-300 hover:bg-red-500/10">
+                  <Trash2 size={15} />
+                </button>
+              )}
+            </div>
+          ))}
+
+          <div className="flex gap-3 pt-1">
+            {links.length < 50 && (
+              <button type="button" onClick={addLink} className="btn-ghost gap-1.5">
+                <Plus size={15} />
+                Add Link
+              </button>
+            )}
+            <button type="submit" disabled={submitting} className="btn-primary ml-auto gap-2">
+              {submitting
+                ? <><span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Submitting…</>
+                : <><Send size={15} /> Submit for Review</>
+              }
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* Jobs list */}
+      <div className="animate-slide-up" style={{ animationDelay: '180ms' }}>
+        <h2 className="text-base font-bold text-white mb-3">
+          Your Review History
+          {active > 0 && (
+            <span className="ml-2 text-xs font-semibold text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded-full">
+              {active} active
+            </span>
+          )}
+        </h2>
+
+        {loading ? (
+          <div className="space-y-2">
+            {[1,2,3].map(i => <div key={i} className="skeleton h-16 rounded-xl" />)}
+          </div>
+        ) : jobs.length === 0 ? (
+          <div className="glass text-center py-16">
+            <div className="text-5xl mb-3">🎬</div>
+            <p className="text-slate-400 font-medium">No reviews yet</p>
+            <p className="text-slate-600 text-sm mt-1">Submit your first Drive link above to get started</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {jobs.map(job => (
+              <JobRow key={job.id} job={job} onClick={() => navigate(`/jobs/${job.id}`)} />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
