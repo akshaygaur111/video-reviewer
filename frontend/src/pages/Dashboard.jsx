@@ -50,7 +50,7 @@ function JobRow({ job, onClick }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-0.5">
           <span className="text-sm font-semibold text-slate-200 truncate">
-            Job #{job.id?.slice(-8)}
+            {job.job_name || `Job #${job.id?.slice(-8)}`}
           </span>
           <StatusBadge status={job.status} size="sm" />
         </div>
@@ -97,6 +97,7 @@ export default function Dashboard() {
   const [loading, setLoading]   = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [links, setLinks]       = useState([''])
+  const [jobName, setJobName]   = useState('')
   const intervalRef             = useRef(null)
 
   const fetchJobs = useCallback(async () => {
@@ -132,9 +133,12 @@ export default function Dashboard() {
     if (!clean.length) { toast.error('Add at least one Drive link'); return }
     setSubmitting(true)
     try {
-      const res = await reviewsAPI.create({ drive_links: clean })
+      const payload = { drive_links: clean }
+      if (jobName.trim()) payload.job_name = jobName.trim()
+      const res = await reviewsAPI.create(payload)
       toast.success(`Review job started for ${clean.length} video${clean.length !== 1 ? 's' : ''}!`)
       setLinks([''])
+      setJobName('')
       await fetchJobs()
       navigate(`/jobs/${res.data.job_id}`)
     } catch (err) {
@@ -181,6 +185,16 @@ export default function Dashboard() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
+          {/* Job name */}
+          <input
+            type="text"
+            value={jobName}
+            onChange={e => setJobName(e.target.value)}
+            placeholder="Job name (e.g. Algebra Chapter 3)"
+            className="input"
+            maxLength={100}
+          />
+
           {links.map((link, i) => (
             <div key={i} className="flex gap-2">
               <input

@@ -4,6 +4,19 @@ import StatusBadge from './StatusBadge'
 import ProgressRigor from './ProgressRigor'
 import IssueCard from './IssueCard'
 
+/** Convert any timestamp string to seconds for sorting */
+function tsToSec(ts) {
+  if (!ts) return 9999
+  const s = String(ts).trim()
+  const msFmt = s.match(/^(\d+)m(\d+)s/)
+  if (msFmt) return parseInt(msFmt[1], 10) * 60 + parseInt(msFmt[2], 10)
+  const hms = s.match(/^(\d+):(\d{2}):(\d{2})/)
+  if (hms) return parseInt(hms[1], 10) * 3600 + parseInt(hms[2], 10) * 60 + parseInt(hms[3], 10)
+  const ms = s.match(/^(\d+):(\d{2})/)
+  if (ms) return parseInt(ms[1], 10) * 60 + parseInt(ms[2], 10)
+  return 9999
+}
+
 function shortLink(url) {
   try {
     const id = url.match(/[?&]id=([^&]+)/)?.[1] ?? url.match(/\/d\/([^/]+)/)?.[1] ?? url
@@ -125,7 +138,7 @@ export default function VideoReviewCard({ video, globalIndex }) {
 
               {hasIssues ? (
                 <div className="space-y-2">
-                  {video.combined_issues.map((issue, i) => (
+                  {[...(video.combined_issues)].sort((a, b) => tsToSec(a.timestamp) - tsToSec(b.timestamp)).map((issue, i) => (
                     <IssueCard key={i} issue={issue} index={i} />
                   ))}
                 </div>

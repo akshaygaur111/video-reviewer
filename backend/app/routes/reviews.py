@@ -47,6 +47,7 @@ async def create_review_job(
 
     job_doc = {
         "user_id": ObjectId(current_user["sub"]),
+        "job_name": job_data.job_name or None,
         "drive_links": job_data.drive_links,
         "status": "pending",
         "videos": videos,

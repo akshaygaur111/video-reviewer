@@ -28,6 +28,7 @@ class TokenResponse(BaseModel):
 
 class ReviewJobCreate(BaseModel):
     drive_links: List[str] = Field(..., min_length=1, max_length=50)
+    job_name: Optional[str] = Field(None, max_length=100)
 
 
 class PassResult(BaseModel):

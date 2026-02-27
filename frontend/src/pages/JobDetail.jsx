@@ -118,7 +118,9 @@ export default function JobDetail() {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <Film size={16} className="text-slate-500" />
-            <h1 className="text-lg font-bold text-white truncate">Job #{job.id?.slice(-8)}</h1>
+            <h1 className="text-lg font-bold text-white truncate">
+              {job.job_name || `Job #${job.id?.slice(-8)}`}
+            </h1>
           </div>
           <p className="text-xs text-slate-500">
             Submitted {new Date(job.created_at).toLocaleString('en-IN', {
