@@ -15,13 +15,23 @@ export default function Login() {
   const handle = async (e) => {
     e.preventDefault()
     setLoading(true)
+    const wakeToast = setTimeout(() => {
+      toast('Server is waking up, please wait…', { icon: '⏳', duration: 30000 })
+    }, 5000)
     try {
       const res = await authAPI.login(form)
+      clearTimeout(wakeToast)
+      toast.dismiss()
       login(res.data)
       toast.success(`Welcome back, ${res.data.username}!`)
       navigate('/dashboard')
     } catch (err) {
-      toast.error(err.response?.data?.detail ?? 'Login failed')
+      clearTimeout(wakeToast)
+      toast.dismiss()
+      const msg = err.code === 'ECONNABORTED'
+        ? 'Server timed out — it may still be waking up, try again in 30s'
+        : (err.response?.data?.detail ?? 'Login failed')
+      toast.error(msg)
     } finally {
       setLoading(false)
     }

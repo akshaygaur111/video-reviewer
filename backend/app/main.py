@@ -25,10 +25,11 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://video-reviewer-alpha.vercel.app",   # ← your actual Vercel URL
-        "http://localhost:3000",         # local dev
+        "https://video-reviewer-alpha.vercel.app",
+        "http://localhost:5173",   # Vite dev server
+        "http://localhost:3000",
     ],
-    allow_credentials=True,
+    allow_credentials=False,   # we use Bearer tokens, not cookies
     allow_methods=["*"],
     allow_headers=["*"],
 )

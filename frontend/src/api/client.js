@@ -4,7 +4,7 @@ const API = axios.create({
   // VITE_API_URL = your Render backend URL (set in Vercel env vars)
   // Falls back to /api for local dev (Vite proxy handles it)
   baseURL: import.meta.env.VITE_API_URL ?? '/api',
-  timeout: 30000,
+  timeout: 90000,   // 90s — Render free tier cold start can take 50-60s
 })
 
 API.interceptors.request.use((config) => {

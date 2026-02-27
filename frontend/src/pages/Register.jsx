@@ -16,13 +16,24 @@ export default function Register() {
     e.preventDefault()
     if (form.password.length < 6) { toast.error('Password must be at least 6 characters'); return }
     setLoading(true)
+    // Warn user if backend is cold-starting (Render free tier)
+    const wakeToast = setTimeout(() => {
+      toast('Server is waking up, please wait…', { icon: '⏳', duration: 30000 })
+    }, 5000)
     try {
       const res = await authAPI.register(form)
+      clearTimeout(wakeToast)
+      toast.dismiss()
       login(res.data)
       toast.success('Account created! Welcome to VideoIQ 🎉')
       navigate('/dashboard')
     } catch (err) {
-      toast.error(err.response?.data?.detail ?? 'Registration failed')
+      clearTimeout(wakeToast)
+      toast.dismiss()
+      const msg = err.code === 'ECONNABORTED'
+        ? 'Server timed out — it may still be waking up, try again in 30s'
+        : (err.response?.data?.detail ?? 'Registration failed')
+      toast.error(msg)
     } finally {
       setLoading(false)
     }
