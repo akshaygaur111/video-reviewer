@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+load_dotenv()  # must be first — loads backend/.env before anything reads os.getenv()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
