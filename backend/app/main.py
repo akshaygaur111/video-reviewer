@@ -11,14 +11,23 @@ import os
 
 
 async def _seed_admin():
-    """Create a default admin user on first boot if none exists."""
+    """Create or reset the admin user on boot."""
     db = get_db()
-    if await db.users.find_one({"role": "admin"}):
-        return  # admin already exists
-
     email    = os.getenv("ADMIN_EMAIL", "admin@videoiq.app")
     username = os.getenv("ADMIN_USERNAME", "admin")
     password = os.getenv("ADMIN_PASSWORD", "VideoIQ@2025!")
+
+    if os.getenv("FORCE_RESET_ADMIN") == "true":
+        # Update existing admin password (use when locked out)
+        await db.users.update_one(
+            {"role": "admin"},
+            {"$set": {"password_hash": hash_password(password), "email": email}},
+        )
+        print(f"🔑 Admin password reset  →  {email}  /  {password}")
+        return
+
+    if await db.users.find_one({"role": "admin"}):
+        return  # admin already exists
 
     await db.users.insert_one({
         "email":         email,
