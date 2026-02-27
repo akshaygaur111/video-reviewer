@@ -1,7 +1,9 @@
 import axios from 'axios'
 
 const API = axios.create({
-  baseURL: '/api',
+  // VITE_API_URL = your Render backend URL (set in Vercel env vars)
+  // Falls back to /api for local dev (Vite proxy handles it)
+  baseURL: import.meta.env.VITE_API_URL ?? '/api',
   timeout: 30000,
 })
 
