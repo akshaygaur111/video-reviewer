@@ -1,6 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from bson import ObjectId
 from datetime import datetime
+import os
+
+from google import genai
 
 from app.auth import get_admin_user, hash_password
 from app.database import get_db
@@ -51,6 +54,19 @@ async def create_user(user_data: UserRegister, admin_user: dict = Depends(get_ad
         "created_at":    datetime.utcnow(),
     })
     return {"id": str(result.inserted_id), "username": user_data.username, "email": user_data.email, "role": "user"}
+
+
+@router.get("/gemini-models")
+async def list_gemini_models(admin_user: dict = Depends(get_admin_user)):
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="GEMINI_API_KEY not configured")
+    client = genai.Client(api_key=api_key)
+    models = [
+        {"name": m.name, "display_name": m.display_name}
+        for m in client.models.list()
+    ]
+    return {"models": models, "count": len(models)}
 
 
 @router.get("/stats")
