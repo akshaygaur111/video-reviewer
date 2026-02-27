@@ -1,5 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from datetime import datetime
+import asyncio
+import re
 import os
 from bson import ObjectId
 
@@ -7,6 +9,7 @@ from app.models import ReviewJobCreate
 from app.auth import get_current_user
 from app.database import get_db
 from app.services.video_review import process_review_job
+from app.services.drive import get_drive_filename
 
 router = APIRouter()
 
@@ -29,9 +32,17 @@ async def create_review_job(
     if not api_key:
         raise HTTPException(status_code=500, detail="GEMINI_API_KEY not configured")
 
+    # Fetch Drive filenames in parallel (best-effort, 5 s timeout each)
+    loop = asyncio.get_event_loop()
+    filenames = await asyncio.gather(*[
+        loop.run_in_executor(None, get_drive_filename, link)
+        for link in job_data.drive_links
+    ])
+
     videos = [
         {
             "drive_link": link,
+            "filename": filenames[i],
             "index": i,
             "status": "pending",
             "transcript": None,
@@ -45,9 +56,19 @@ async def create_review_job(
         for i, link in enumerate(job_data.drive_links)
     ]
 
+    # Auto-derive job name from filenames when not supplied manually
+    if job_data.job_name:
+        resolved_name = job_data.job_name
+    else:
+        valid = [n for n in filenames if n]
+        if valid:
+            resolved_name = valid[0] if len(valid) == 1 else f"{valid[0]} +{len(job_data.drive_links)-1} more"
+        else:
+            resolved_name = None
+
     job_doc = {
         "user_id": ObjectId(current_user["sub"]),
-        "job_name": job_data.job_name or None,
+        "job_name": resolved_name,
         "drive_links": job_data.drive_links,
         "status": "pending",
         "videos": videos,

@@ -20,6 +20,31 @@ def extract_file_id(url: str) -> Optional[str]:
     return None
 
 
+def get_drive_filename(url: str) -> Optional[str]:
+    """
+    Fetch just the filename for a Drive link by reading the Content-Disposition
+    header — no body download needed.  Returns None on any failure.
+    """
+    file_id = extract_file_id(url)
+    if not file_id:
+        return None
+    try:
+        r = requests.get(
+            f"https://drive.google.com/uc?export=download&id={file_id}",
+            stream=True, timeout=5, allow_redirects=True,
+        )
+        r.close()
+        cd = r.headers.get("Content-Disposition", "")
+        m = re.search(r'filename\*?=(?:UTF-8\'\')?["\']?([^"\';\r\n]+)', cd, re.IGNORECASE)
+        if m:
+            name = m.group(1).strip().strip('"\'')
+            # Strip file extension for display
+            return re.sub(r'\.[^.]{2,5}$', '', name).strip() or None
+    except Exception:
+        pass
+    return None
+
+
 def download_from_drive(url: str) -> str:
     """
     Download a Google Drive shared file to a unique temp path.

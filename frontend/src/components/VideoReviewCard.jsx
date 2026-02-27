@@ -62,11 +62,11 @@ export default function VideoReviewCard({ video, globalIndex }) {
           </span>
         </div>
 
-        {/* Link */}
+        {/* Link / filename */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 text-slate-400 text-xs mb-0.5">
             <Link2 size={11} />
-            <span className="font-mono truncate">{shortLink(video.drive_link)}</span>
+            <span className="truncate">{video.filename || shortLink(video.drive_link)}</span>
           </div>
           <div className="flex items-center gap-3">
             <StatusBadge status={video.status} size="sm" />
