@@ -205,7 +205,7 @@ async def _process_single_video(
 
     try:
         genai.configure(api_key=api_key)
-        model_name = "gemini-1.5-flash"
+        model_name = "gemini-2.0-flash"
         loop = asyncio.get_running_loop()
 
         # ── 1. Download ──────────────────────────────────────────────────────
