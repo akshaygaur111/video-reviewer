@@ -38,9 +38,10 @@ export const reviewsAPI = {
 }
 
 export const adminAPI = {
-  getAllJobs: () => API.get('/admin/jobs'),
-  getUsers:   () => API.get('/admin/users'),
-  getStats:   () => API.get('/admin/stats'),
+  getAllJobs:  ()  => API.get('/admin/jobs'),
+  getUsers:    ()  => API.get('/admin/users'),
+  getStats:    ()  => API.get('/admin/stats'),
+  createUser:  (d) => API.post('/admin/users', d),
 }
 
 export default API

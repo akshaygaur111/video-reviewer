@@ -1,8 +1,10 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from bson import ObjectId
+from datetime import datetime
 
-from app.auth import get_admin_user
+from app.auth import get_admin_user, hash_password
 from app.database import get_db
+from app.models import UserRegister
 
 router = APIRouter()
 
@@ -30,6 +32,25 @@ async def get_all_users(admin_user: dict = Depends(get_admin_user)):
         u["id"] = str(u.pop("_id"))
         users.append(u)
     return users
+
+
+@router.post("/users", status_code=201)
+async def create_user(user_data: UserRegister, admin_user: dict = Depends(get_admin_user)):
+    db = get_db()
+    existing = await db.users.find_one(
+        {"$or": [{"email": user_data.email}, {"username": user_data.username}]}
+    )
+    if existing:
+        raise HTTPException(status_code=400, detail="Email or username already taken")
+
+    result = await db.users.insert_one({
+        "email":         user_data.email,
+        "username":      user_data.username,
+        "password_hash": hash_password(user_data.password),
+        "role":          "user",
+        "created_at":    datetime.utcnow(),
+    })
+    return {"id": str(result.inserted_id), "username": user_data.username, "email": user_data.email, "role": "user"}
 
 
 @router.get("/stats")

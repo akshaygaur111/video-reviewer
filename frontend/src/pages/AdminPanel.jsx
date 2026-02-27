@@ -4,7 +4,7 @@ import { adminAPI } from '../api/client'
 import StatusBadge from '../components/StatusBadge'
 import {
   Users, Film, CheckCircle, Loader, AlertTriangle,
-  ChevronRight, Shield, RefreshCw, TrendingUp
+  Shield, RefreshCw, UserPlus, X
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -23,6 +23,80 @@ function StatTile({ icon: Icon, label, value, color, bg, note }) {
   )
 }
 
+function CreateUserModal({ onClose, onCreated }) {
+  const [form, setForm] = useState({ email: '', username: '', password: '' })
+  const [saving, setSaving] = useState(false)
+
+  const handle = async (e) => {
+    e.preventDefault()
+    setSaving(true)
+    try {
+      await adminAPI.createUser(form)
+      toast.success(`User "${form.username}" created`)
+      onCreated()
+      onClose()
+    } catch (err) {
+      toast.error(err.response?.data?.detail ?? 'Failed to create user')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+      <div className="glass w-full max-w-md p-7 rounded-2xl animate-slide-up">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-bold text-white">Create User</h3>
+          <button onClick={onClose} className="text-slate-500 hover:text-slate-300 transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+        <form onSubmit={handle} className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Username</label>
+            <input
+              type="text" required minLength={3}
+              value={form.username}
+              onChange={e => setForm({ ...form, username: e.target.value })}
+              placeholder="john_doe"
+              className="input"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Email</label>
+            <input
+              type="email" required
+              value={form.email}
+              onChange={e => setForm({ ...form, email: e.target.value })}
+              placeholder="john@company.com"
+              className="input"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Password</label>
+            <input
+              type="password" required minLength={6}
+              value={form.password}
+              onChange={e => setForm({ ...form, password: e.target.value })}
+              placeholder="Minimum 6 characters"
+              className="input"
+            />
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={onClose} className="btn-ghost flex-1">Cancel</button>
+            <button type="submit" disabled={saving} className="btn-primary flex-1">
+              {saving
+                ? <><span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Creating…</>
+                : 'Create User'
+              }
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 export default function AdminPanel() {
   const navigate = useNavigate()
   const [stats,  setStats]  = useState(null)
@@ -30,6 +104,7 @@ export default function AdminPanel() {
   const [users,  setUsers]  = useState([])
   const [tab,    setTab]    = useState('jobs')
   const [loading, setLoading] = useState(true)
+  const [showCreate, setShowCreate] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -49,6 +124,8 @@ export default function AdminPanel() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
+      {showCreate && <CreateUserModal onClose={() => setShowCreate(false)} onCreated={load} />}
+
       {/* Header */}
       <div className="flex items-center justify-between animate-slide-up">
         <div className="flex items-center gap-3">
@@ -80,20 +157,28 @@ export default function AdminPanel() {
 
       {/* Tabs */}
       <div className="animate-slide-up" style={{ animationDelay: '120ms' }}>
-        <div className="flex gap-1 mb-4 p-1 glass rounded-xl w-fit">
-          {['jobs', 'users'].map(t => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all capitalize ${
-                tab === t
-                  ? 'bg-brand-purple text-white shadow-lg'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              {t === 'jobs' ? `All Jobs (${jobs.length})` : `Users (${users.length})`}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex gap-1 p-1 glass rounded-xl w-fit">
+            {['jobs', 'users'].map(t => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all capitalize ${
+                  tab === t
+                    ? 'bg-brand-purple text-white shadow-lg'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {t === 'jobs' ? `All Jobs (${jobs.length})` : `Users (${users.length})`}
+              </button>
+            ))}
+          </div>
+          {tab === 'users' && (
+            <button onClick={() => setShowCreate(true)} className="btn-primary gap-2 text-sm px-4 py-2">
+              <UserPlus size={14} />
+              Create User
             </button>
-          ))}
+          )}
         </div>
 
         {/* Jobs table */}
@@ -171,7 +256,7 @@ export default function AdminPanel() {
                       {u.role}
                     </span>
                     <span className="text-xs text-slate-600">
-                      {new Date(u.created_at).toLocaleDateString()}
+                      {u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}
                     </span>
                   </div>
                 ))}

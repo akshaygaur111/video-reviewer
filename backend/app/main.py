@@ -21,10 +21,11 @@ async def _seed_admin():
     password = os.getenv("ADMIN_PASSWORD", "VideoIQ@2025!")
 
     await db.users.insert_one({
-        "email":    email,
-        "username": username,
-        "password": hash_password(password),
-        "role":     "admin",
+        "email":         email,
+        "username":      username,
+        "password_hash": hash_password(password),
+        "role":          "admin",
+        "created_at":    __import__("datetime").datetime.utcnow(),
     })
     print(f"✅ Admin seeded  →  {email}  /  {password}")
 
