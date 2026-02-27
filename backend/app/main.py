@@ -4,6 +4,7 @@ load_dotenv()  # must be first — loads backend/.env before anything reads os.g
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+from datetime import datetime
 from app.database import connect_db, disconnect_db, get_db
 from app.routes import auth as auth_routes, reviews as review_routes, admin as admin_routes
 from app.auth import hash_password
@@ -39,10 +40,38 @@ async def _seed_admin():
     print(f"✅ Admin seeded  →  {email}  /  {password}")
 
 
+async def _recover_stuck_jobs():
+    """
+    On startup, mark any jobs/videos that were left in 'processing' or 'pending'
+    from a previous server crash/sleep as 'failed', so users know to resubmit.
+    """
+    db = get_db()
+    result = await db.jobs.update_many(
+        {"status": {"$in": ["processing", "pending"]}},
+        {"$set": {
+            "status": "failed",
+            "completed_at": datetime.utcnow(),
+        }},
+    )
+    if result.modified_count:
+        # Also mark individual videos inside those jobs
+        await db.jobs.update_many(
+            {"videos.status": {"$in": ["processing", "pending"]}},
+            {"$set": {
+                "videos.$[v].status": "failed",
+                "videos.$[v].error": "Server restarted — please resubmit this job",
+                "videos.$[v].completed_at": datetime.utcnow(),
+            }},
+            array_filters=[{"v.status": {"$in": ["processing", "pending"]}}],
+        )
+        print(f"⚠️  Recovered {result.modified_count} stuck job(s) → marked failed")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await connect_db()
     await _seed_admin()
+    await _recover_stuck_jobs()
     yield
     await disconnect_db()
 
