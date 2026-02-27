@@ -1,9 +1,11 @@
 """
 Video review service — 3-pass progressive rigor system.
 
-Pass 1: Standard audit (temperature=0.10)
-Pass 2: Enhanced (temperature=0.05) if Pass 1 found 0 issues
-Pass 3: Maximum scrutiny (temperature=0.01) if Pass 2 found 0 issues
+Pass 1: Standard audit    (temperature=0.10) — always runs
+Pass 2: Enhanced scrutiny (temperature=0.05) — always runs
+Pass 3: Maximum scrutiny  (temperature=0.01) — always runs
+
+All three passes run unconditionally and their findings are merged.
 
 All passes run sequentially per video.
 Multiple videos in a job are processed concurrently via asyncio.gather.
@@ -113,17 +115,8 @@ Confidence threshold: 70%.
 
 
 def _determine_rigor(pass_number: int, previous_passes: List[Dict]) -> str:
-    """Progressive rigor: escalate only if previous pass found 0 issues."""
-    if pass_number == 1:
-        return "standard"
-    prev = previous_passes[-1] if previous_passes else None
-    if prev and prev.get("issues_found", 1) == 0:
-        if pass_number == 2:
-            return "enhanced"
-        if pass_number == 3:
-            return "maximum"
-    # Default: keep current level from previous pass
-    return prev.get("rigor_level", "standard") if prev else "standard"
+    """Always escalate rigor with each pass, regardless of previous results."""
+    return {1: "standard", 2: "enhanced", 3: "maximum"}[pass_number]
 
 
 def _combine_issues(passes: List[Dict]) -> List[Dict]:

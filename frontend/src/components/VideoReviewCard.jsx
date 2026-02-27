@@ -126,7 +126,7 @@ export default function VideoReviewCard({ video, globalIndex }) {
                 <div className="text-center py-6">
                   <div className="text-4xl mb-2">🎉</div>
                   <p className="text-sm text-emerald-400 font-medium">Zero issues detected</p>
-                  <p className="text-xs text-slate-500 mt-1">All 3 passes (incl. maximum rigor) found nothing</p>
+                  <p className="text-xs text-slate-500 mt-1">Standard → Enhanced → Maximum — all 3 passes clean</p>
                 </div>
               )}
             </div>
