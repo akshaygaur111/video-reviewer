@@ -20,10 +20,37 @@ function getStyle(category = '') {
   }
 }
 
-/** Strip milliseconds from timestamps like "1:23.456" or "00:01:23.456" → "1:23" / "00:01:23" */
+/**
+ * Normalise any timestamp Gemini returns into M:SS
+ *   "2m21s636ms"  → "2:21"
+ *   "0m21s"       → "0:21"
+ *   "1:23.456"    → "1:23"
+ *   "00:01:23"    → "1:23"
+ *   "0:24"        → "0:24"  (pass-through)
+ */
 function formatTimestamp(ts) {
   if (!ts) return '--:--'
-  return String(ts).replace(/(\d+:\d{2})\.\d+$/, '$1').trim() || '--:--'
+  const s = String(ts).trim()
+
+  // "2m21s636ms" or "2m21s"
+  const msFmt = s.match(/^(\d+)m(\d+)s/)
+  if (msFmt) {
+    const m   = parseInt(msFmt[1], 10)
+    const sec = String(parseInt(msFmt[2], 10)).padStart(2, '0')
+    return `${m}:${sec}`
+  }
+
+  // "00:01:23" (HH:MM:SS) → drop hours if 0
+  const hms = s.match(/^(\d+):(\d{2}):(\d{2})/)
+  if (hms) {
+    const h = parseInt(hms[1], 10)
+    const m = parseInt(hms[2], 10) + h * 60
+    const sec = hms[3]
+    return `${m}:${sec}`
+  }
+
+  // "1:23.456" → strip ms
+  return s.replace(/(\d+:\d{2})\.\d+$/, '$1') || '--:--'
 }
 
 export default function IssueCard({ issue, index }) {
