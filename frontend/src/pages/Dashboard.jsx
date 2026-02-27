@@ -126,6 +126,19 @@ export default function Dashboard() {
   const rmLink   = (i) => setLinks(links.filter((_, idx) => idx !== i))
   const setLink  = (i, v) => setLinks(links.map((l, idx) => idx === i ? v : l))
 
+  const handlePaste = (i, e) => {
+    const text = e.clipboardData.getData('text')
+    const parts = text.split(/[\n\r,]+/).map(s => s.trim()).filter(Boolean)
+    if (parts.length > 1) {
+      e.preventDefault()
+      const before = links.slice(0, i)
+      const after  = links.slice(i + 1).filter(Boolean)
+      const merged = [...before, ...parts, ...after].slice(0, 50)
+      setLinks(merged)
+      toast.success(`${parts.length} links detected`)
+    }
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     const clean = links.map(l => l.trim()).filter(Boolean)
@@ -176,7 +189,7 @@ export default function Dashboard() {
           </div>
           <div>
             <h2 className="text-base font-bold text-white">New Review Job</h2>
-            <p className="text-xs text-slate-500">Paste Google Drive share links (up to 50)</p>
+            <p className="text-xs text-slate-500">Paste one link per field, or paste multiple links at once (newline-separated)</p>
           </div>
         </div>
 
@@ -187,6 +200,7 @@ export default function Dashboard() {
                 type="url"
                 value={link}
                 onChange={e => setLink(i, e.target.value)}
+                onPaste={e => handlePaste(i, e)}
                 placeholder={`https://drive.google.com/file/d/…/view  (video ${i + 1})`}
                 className="input flex-1 font-mono text-xs"
               />
