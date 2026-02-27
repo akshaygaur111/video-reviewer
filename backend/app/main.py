@@ -24,7 +24,10 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://video-reviewer-alpha.vercel.app",   # ← your actual Vercel URL
+        "http://localhost:3000",         # local dev
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
