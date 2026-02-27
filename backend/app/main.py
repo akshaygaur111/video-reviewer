@@ -100,6 +100,6 @@ app.include_router(review_routes.router, prefix="/api/reviews", tags=["reviews"]
 app.include_router(admin_routes.router, prefix="/api/admin", tags=["admin"])
 
 
-@app.get("/api/health")
+@app.api_route("/api/health", methods=["GET", "HEAD"])
 async def health_check():
     return {"status": "ok", "version": "2.0.0"}
