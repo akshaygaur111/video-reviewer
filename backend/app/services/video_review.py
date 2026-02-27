@@ -27,7 +27,7 @@ from app.database import get_db
 from app.services.drive import download_from_drive
 
 
-MODEL_NAME = "gemini-2.0-flash-latest"
+MODEL_NAME = "gemini-2.5-flash"
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
