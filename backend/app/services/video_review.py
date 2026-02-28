@@ -8,7 +8,7 @@ Pass 3: Maximum scrutiny  (temperature=0.01) — always runs
 All three passes run unconditionally and their findings are merged.
 
 All passes run sequentially per video.
-Multiple videos in a job are processed concurrently via asyncio.gather.
+Multiple videos in a job are processed sequentially (one at a time).
 """
 
 import asyncio
@@ -319,7 +319,7 @@ async def _process_single_video(
 async def process_review_job(job_id: str, drive_links: List[str], api_key: str):
     """
     Entry point for background processing.
-    All videos are processed concurrently; each video runs its 3 passes sequentially.
+    Videos are processed sequentially (one at a time); each video runs its 3 passes sequentially.
     """
     db = get_db()
     await db.jobs.update_one(
@@ -328,11 +328,8 @@ async def process_review_job(job_id: str, drive_links: List[str], api_key: str):
 
     print(f"[Job {job_id}] Starting — {len(drive_links)} video(s)")
 
-    tasks = [
-        _process_single_video(job_id, i, link, api_key)
-        for i, link in enumerate(drive_links)
-    ]
-    await asyncio.gather(*tasks, return_exceptions=True)
+    for i, link in enumerate(drive_links):
+        await _process_single_video(job_id, i, link, api_key)
 
     # Determine final status
     job = await db.jobs.find_one({"_id": ObjectId(job_id)})
