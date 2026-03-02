@@ -30,57 +30,79 @@ from app.services.drive import download_from_drive
 MODEL_NAME = "gemini-2.5-flash"
 
 
-# ── Human-curated issue patterns ──────────────────────────────────────────────
-# Extracted from manual reviews of 20 videos. These teach the model to catch
-# issue types it consistently missed.
+# ── Universal review dimensions ───────────────────────────────────────────────
+# These are topic-agnostic aspects every educational video should be checked
+# against, regardless of subject matter.
 
-HUMAN_FEEDBACK_PATTERNS = """
-KNOWN ISSUE PATTERNS (from past human reviews — actively look for these):
+REVIEW_DIMENSIONS = """
+REVIEW DIMENSIONS — apply all of these to every video regardless of topic:
 
-TITLE & TEXT FORMATTING:
-- Colon missing in topic title before subtitle text (e.g. "Comparing Expressions" → "Comparing Expressions: Two Expressions")
-- Ordinal numbers written as abbreviations in on-screen text instead of words (e.g. "5th" should be "fifth")
+1. VISUAL-AUDIO SYNCHRONISATION
+   Check that every on-screen element (text, highlight, animation, diagram)
+   appears at the exact moment the narrator introduces it — not before, not
+   significantly after. Any mismatch between what is said and what is shown is
+   a defect.
 
-PRONUNCIATION & LANGUAGE:
-- Decimals spoken as "zero point one" / "zero point zero one" instead of "one tenth" / "one hundredth"
-- Mathematical operation symbols introduced as symbols rather than words (e.g. "+" shown/said instead of "addition")
-- Videos should include at least one example where numbers are written in words (not digits)
+2. PROGRESSIVE REVEAL
+   Content must build up step by step as the narrator explains it. Nothing
+   should be pre-filled, pre-highlighted, or already on screen before being
+   introduced. Elements should arrive as the narrator speaks them.
 
-PRE-POPULATION ISSUES:
-- Numbers, decimals, or answers appearing on screen before the narrator introduces them
-- All elements should appear progressively as the narrator speaks them — nothing pre-filled
-- Values highlighted or coloured before the narrator discusses them (e.g. answer highlighted from question start)
+3. HIGHLIGHTING DISCIPLINE
+   Only the element currently being discussed should be highlighted or
+   emphasised. Flag: over-highlighting, too many simultaneous highlights,
+   highlights on the wrong element, and highlights that start too early or
+   linger too long. Visual emphasis must always match narrative focus.
+   When zooming into or focusing on a sub-part of a larger structure,
+   the outer structure should remain visible and distinguished (e.g.
+   highlighted border), not hidden or removed.
 
-HIGHLIGHTING & ANIMATION TIMING:
-- Elements highlighted at wrong timestamps (too early or too late relative to narration)
-- Too many colours used simultaneously — cognitive overload for students
-- Over-highlighting of symbols
-- When the focus is on an expression inside parentheses: parentheses must be highlighted, NOT removed
-- Bounding boxes or visual frames appearing before they are introduced in narration
-- Numbers or values highlighted at the wrong moment (e.g. 5 and 12 highlighted before they are referenced)
+4. FACTUAL & CONTENT ACCURACY
+   Verify every value, calculation, label, or statement shown on screen is
+   correct. Check that no wrong, partial, or intermediate results are shown
+   when only the final correct value should appear. Verify any steps shown
+   are logically sound and complete.
 
-MATHEMATICAL ACCURACY:
-- Incorrect rounding (verify which digit is used and the rounding direction)
-- Showing intermediate or incorrect values that should not appear (e.g. 3.155 when only 3.15 should be shown)
-- Decimal points not aligned in vertical arithmetic (addition/subtraction columns)
-- Showing a rounded/partial result alongside a full result when only one should be visible
+5. LANGUAGE & TERMINOLOGY
+   Concepts and terms should be introduced and referred to consistently using
+   proper, age-appropriate language throughout the video. Prefer full words
+   over symbols or abbreviations when introducing a concept for the first time.
+   Spoken language must match on-screen text — flag any discrepancy.
 
-PEDAGOGICAL STRUCTURE:
-- Multiple consecutive examples using the same teaching approach with no variety
-- Examples that appear identical or nearly identical to external sources (e.g. IXL)
-- MCQ / multiple-choice options shown when the student should be guided to construct the answer
-- Examples ordered in wrong difficulty progression (harder before easier)
-- Missing explanation of a core concept that was introduced (e.g. how parentheses change order of operations)
-- Key terms in word problems not highlighted or explained before being used in expressions
-- Numbers taken from a word problem used without describing what each number represents
+6. TEXT & VISUAL FORMATTING
+   On-screen text must be grammatically correct, properly punctuated, and
+   consistently formatted. Check: capitalisation, punctuation in titles and
+   labels, alignment of columns or equations, readability of font sizes, and
+   that all visual elements are large enough to be clearly seen.
 
-CONTENT COMPLETENESS & EXAMPLE DIVERSITY:
-- Intro section is unnecessarily long and should be trimmed (flag with start/end timestamps)
-- Placeholder zeros not highlighted or animated when added during decimal operations
-- Number lines missing step-by-step count markers (e.g. counting 1–10 for tenths representation)
-- Diagrams or models too small to be clearly visible to students
-- All examples use only small numbers — at least one example should use large numbers (e.g. 3+ digits before decimal, 4+ after)
-- Examples lack diversity in number types (missing word-form numbers, missing large-scale numbers)
+7. PEDAGOGICAL STRUCTURE
+   Evaluate the teaching approach:
+   - Examples should guide the student toward the answer, not just test them.
+   - Consecutive examples should vary in approach and not repeat the same
+     method or structure.
+   - Difficulty should progress logically (simpler before complex).
+   - Every concept introduced must be explained — do not leave anything
+     unresolved.
+   - Key terms or elements from a problem should be identified and explained
+     before being used in a solution.
+
+8. EXAMPLE DIVERSITY & COVERAGE
+   The set of examples in the video should collectively cover the concept
+   broadly. Flag if: all examples follow the same pattern, examples lack
+   variety in scale or form, or the examples do not adequately represent the
+   range of situations a student might encounter.
+
+9. INTRO & PACING
+   The introduction should be concise and directly relevant. Flag any intro
+   that is unnecessarily long before the actual content begins (provide
+   timestamps). Check that the overall pacing allows students adequate time
+   to absorb each step.
+
+10. CONTENT COMPLETENESS
+    Every concept or element introduced in the video must be fully addressed.
+    Flag anything that is shown or mentioned but not explained, any steps that
+    are skipped without acknowledgement, and any visual elements that appear
+    without context.
 """
 
 
@@ -110,7 +132,7 @@ def _rigor_prompt(rigor: str, transcript: str) -> str:
 TRANSCRIPT (ground truth for audio):
 {transcript}
 
-{HUMAN_FEEDBACK_PATTERNS}
+{REVIEW_DIMENSIONS}
 
 OUTPUT: Return ONLY a JSON array. Each element must have keys:
   timestamp, category, description, suggestion
@@ -122,14 +144,7 @@ You are a Senior QA Specialist reviewing an educational video.
 
 {base}
 
-CHECKLIST:
-1. MATH ACCURACY — verify every calculation and formula on screen.
-2. AUDIO-VISUAL MISMATCH — compare what the speaker says (transcript) with what is shown.
-3. GRAMMAR & SPELLING — catch typos in on-screen text or grammatical errors in narration.
-4. LOGICAL FLOW — flag any explanation that is out of order or confusing.
-5. KNOWN PATTERNS — flag any issue matching the KNOWN ISSUE PATTERNS listed above.
-
-Confidence threshold: 90%.
+Apply all 10 REVIEW DIMENSIONS above. Confidence threshold: 90%.
 """
     elif rigor == "enhanced":
         return f"""
@@ -138,16 +153,11 @@ The previous review found ZERO issues, so you must look DEEPER.
 
 {base}
 
-ENHANCED CHECKLIST:
-1. SUBTLE TIMING — even 1–2 second delays between audio and visual highlights.
-2. NOTATION — inconsistent ways of writing numbers, fractions, or symbols vs speech.
-3. SOFT PRONUNCIATION — words slightly mispronounced that change meaning.
-4. COLOR CODING — wrong colors in diagrams or highlighted text.
-5. MISSING LABELS/UNITS — equations or graphs missing proper labels.
-6. VISUAL CONTINUITY — elements appearing/disappearing at the wrong moment.
-7. DEFINITION ACCURACY — are technical terms defined correctly?
-8. STEP SKIPPING — any solution steps missing that could confuse students?
-9. KNOWN PATTERNS — re-check every item in the KNOWN ISSUE PATTERNS listed above.
+Apply all 10 REVIEW DIMENSIONS above with extra focus on:
+- Subtle timing gaps (even 1–2 seconds) between audio and visual.
+- Inconsistencies in how terms or values are written vs spoken.
+- Elements appearing or disappearing at the wrong moment.
+- Steps skipped without acknowledgement.
 
 Confidence threshold: 80%.
 """
@@ -158,18 +168,12 @@ Two previous reviews found ZERO issues. Apply MAXIMUM scrutiny.
 
 {base}
 
-MAXIMUM CHECKLIST:
-1. FRAME-LEVEL ACCURACY — every number, symbol, and operator visible on screen.
-2. MICRO-INCONSISTENCIES — smallest formatting differences that could confuse students.
-3. FONT & CONTRAST — text that is hard to read, too small, or poorly contrasted.
-4. BACKGROUND DISTRACTIONS — audio or visual elements that distract from content.
-5. ACCESSIBILITY — contrast ratios, text size, readability for all learners.
-6. PEDAGOGICAL SEQUENCING — is the teaching order optimal? Any missed teaching moments?
-7. PACING — narrator too fast or too slow at any specific point?
-8. TERMINOLOGY CONSISTENCY — same terms used consistently throughout?
-9. RECORDING ARTIFACTS — visual glitches, cursor distractions, screen artifacts.
-10. CONTENT COMPLETENESS — any concept introduced but not resolved?
-11. KNOWN PATTERNS — apply every item in the KNOWN ISSUE PATTERNS above as an explicit checklist.
+Apply all 10 REVIEW DIMENSIONS above as an explicit checklist. Additionally:
+- Frame-level accuracy: every value and symbol visible on screen.
+- Font, contrast, and readability for all learners.
+- Recording artifacts: glitches, stray cursors, screen transitions.
+- Pacing: is the narrator too fast or too slow at any point?
+- Terminology consistency throughout the entire video.
 
 Confidence threshold: 70%.
 """
