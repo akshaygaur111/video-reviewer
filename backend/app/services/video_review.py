@@ -156,12 +156,27 @@ def extract_json(text: str) -> List[Dict]:
     return []
 
 
+def _format_prior_issues(previous_passes: List[Dict]) -> str:
+    """Flatten issues from all previous passes into a readable summary."""
+    items = []
+    for p in previous_passes:
+        for issue in p.get("issues", []):
+            ts = issue.get("timestamp", "?")
+            cat = issue.get("category", "")
+            desc = issue.get("description", "")
+            items.append(f"  [{ts}] ({cat}) {desc}")
+    return "\n".join(items) if items else "  (none)"
+
+
 def _rigor_prompt(
     rigor: str,
     transcript: str,
     grade: Optional[str] = None,
     include_suggestions: bool = True,
+    previous_passes: Optional[List[Dict]] = None,
 ) -> str:
+    previous_passes = previous_passes or []
+
     grade_block = ""
     if grade:
         grade_block = f"""
@@ -175,13 +190,50 @@ Calibrate your assessment accordingly:
     output_keys = "timestamp, category, description, suggestion" if include_suggestions else "timestamp, category, description"
     suggestion_note = "" if include_suggestions else "\n  Do NOT include a 'suggestion' key — omit it entirely."
 
+    prior_block = ""
+    if previous_passes:
+        total_prior = sum(p.get("issues_found", 0) for p in previous_passes)
+        prior_block = f"""
+ISSUES ALREADY REPORTED BY PREVIOUS PASSES ({total_prior} total — do NOT repeat these):
+{_format_prior_issues(previous_passes)}
+
+Your task: find issues that the previous pass(es) MISSED. Look for different dimensions,
+different timestamps, and subtler defects not yet captured above.
+"""
+
+    checklist = """
+MANDATORY ANALYSIS METHOD — work through EVERY dimension below BEFORE writing your JSON:
+  1. VISUAL-AUDIO SYNCHRONISATION  — scan every moment a new element appears or changes
+  2. PROGRESSIVE REVEAL            — nothing pre-shown or pre-filled before introduction
+  3. HIGHLIGHTING DISCIPLINE       — only current element is highlighted; no over-highlighting
+  4. FACTUAL & CONTENT ACCURACY    — verify EVERY number, calculation, label, and formula on screen
+  5. LANGUAGE & TERMINOLOGY        — consistent, age-appropriate, spoken = written
+  6. TEXT & VISUAL FORMATTING      — grammar, punctuation, capitalisation, readability
+  7. PEDAGOGICAL STRUCTURE         — examples guide, difficulty progresses, nothing unresolved
+  8. EXAMPLE DIVERSITY & COVERAGE  — sufficient variety in the example set
+  9. INTRO & PACING                — concise intro; enough time at each step
+ 10. CONTENT COMPLETENESS          — every introduced concept is fully addressed
+ 11. PEDAGOGICAL FLOW & SEQUENCING — correct order; no premature abstraction; guided before independent
+ 12. COGNITIVE LOAD MANAGEMENT     — working memory respected; no surplus simultaneous elements
+
+VISUAL ACCURACY REQUIREMENT:
+  For every number, variable, or formula that appears on screen:
+    - Verify its value is mathematically correct.
+    - Verify it appears at the exact moment the narrator states it (not before, not after).
+    - Verify any labels (e.g. "Product =", "Length =") are used with the correct meaning.
+  For every shading, highlighting, or animation:
+    - Verify the order and direction of the operation matches how the problem was stated.
+    - Verify the result of the operation is shown correctly.
+"""
+
     base = f"""
 TRANSCRIPT (ground truth for audio):
 {transcript}
-{grade_block}
+{grade_block}{prior_block}
 {REVIEW_DIMENSIONS}
-
-OUTPUT: Return ONLY a JSON array. Each element must have keys:
+{checklist}
+OUTPUT: First briefly note (one line per dimension) whether each of the 12 dimensions is clean or has issues.
+Then output ONLY a JSON array of issue objects. Each element must have keys:
   {output_keys}{suggestion_note}
 If there are no issues return an empty array [].
 """
@@ -191,42 +243,55 @@ You are a Senior QA Specialist reviewing an educational video.
 
 {base}
 
-Apply all 12 REVIEW DIMENSIONS above. Confidence threshold: 90%.
+Apply all 12 REVIEW DIMENSIONS systematically. Confidence threshold: 85%.
 """
     elif rigor == "enhanced":
+        prior_count = sum(p.get("issues_found", 0) for p in previous_passes)
+        context = (
+            f"Pass 1 found {prior_count} issue(s) (listed above). Your job is to find ADDITIONAL issues it missed."
+            if prior_count > 0
+            else "The previous pass found no issues — look harder."
+        )
         return f"""
 You are a Senior QA Specialist with eagle-eye attention to detail.
-The previous review found ZERO issues, so you must look DEEPER.
+{context}
 
 {base}
 
-Apply all 12 REVIEW DIMENSIONS above with extra focus on:
+Apply all 12 REVIEW DIMENSIONS with extra scrutiny on:
 - Subtle timing gaps (even 1–2 seconds) between audio and visual.
-- Inconsistencies in how terms or values are written vs spoken.
+- Inconsistencies in how terms, values, or labels are written vs spoken.
 - Elements appearing or disappearing at the wrong moment.
 - Steps skipped without acknowledgement.
 - Sequencing issues: does the visual order match the stated problem order?
-- Cognitive load: are too many elements on screen simultaneously?
+- Cognitive load: are too many elements visible simultaneously?
+- Any label or annotation used with an incorrect meaning.
 
-Confidence threshold: 80%.
+Confidence threshold: 70%.
 """
     else:  # maximum
+        prior_count = sum(p.get("issues_found", 0) for p in previous_passes)
+        context = (
+            f"Previous passes found {prior_count} issue(s) (listed above). Find what they STILL missed."
+            if prior_count > 0
+            else "Two previous passes found no issues. Apply MAXIMUM scrutiny."
+        )
         return f"""
 You are the Chief QA Director with 20+ years of educational content review.
-Two previous reviews found ZERO issues. Apply MAXIMUM scrutiny.
+{context}
 
 {base}
 
-Apply all 12 REVIEW DIMENSIONS above as an explicit checklist. Additionally:
-- Frame-level accuracy: every value and symbol visible on screen.
-- Font, contrast, and readability for all learners.
-- Recording artifacts: glitches, stray cursors, screen transitions.
-- Pacing: is the narrator too fast or too slow at any point?
-- Terminology consistency throughout the entire video.
-- Pedagogical sequencing: does every demonstration follow the stated problem order?
-- Working memory: count simultaneous on-screen elements at each step.
+Apply all 12 REVIEW DIMENSIONS as an explicit, exhaustive checklist. Additionally:
+- Frame-level accuracy: every single value and symbol visible on screen at any point.
+- Font size, contrast, and readability for the target age group.
+- Recording artifacts: glitches, stray cursors, unwanted screen elements, transitions.
+- Pacing: too fast or too slow at any specific moment (give timestamps).
+- Terminology consistency: does the same concept always use the same word/symbol?
+- Pedagogical sequencing: does every single visual demonstration follow the stated problem order?
+- Working memory: how many unresolved items are on screen at each step?
 
-Confidence threshold: 70%.
+Confidence threshold: 60%.
 """
 
 
@@ -271,9 +336,15 @@ async def _run_pass(
     transcript: str,
     grade: Optional[str] = None,
     include_suggestions: bool = True,
+    previous_passes: Optional[List[Dict]] = None,
 ) -> Dict:
     temperature = {"standard": 0.10, "enhanced": 0.05, "maximum": 0.01}[rigor]
-    prompt = _rigor_prompt(rigor, transcript, grade=grade, include_suggestions=include_suggestions)
+    prompt = _rigor_prompt(
+        rigor, transcript,
+        grade=grade,
+        include_suggestions=include_suggestions,
+        previous_passes=previous_passes or [],
+    )
     loop = asyncio.get_running_loop()
 
     config = types.GenerateContentConfig(
@@ -373,7 +444,12 @@ async def _process_single_video(
             print(
                 f"[Job {job_id}] Video {video_index}: Pass {pass_num} ({rigor})..."
             )
-            result = await _run_pass(client, video_file, pass_num, rigor, transcript, grade=grade, include_suggestions=include_suggestions)
+            result = await _run_pass(
+                client, video_file, pass_num, rigor, transcript,
+                grade=grade,
+                include_suggestions=include_suggestions,
+                previous_passes=passes,   # passes accumulated so far
+            )
             passes.append(result)
 
             # Stream pass result into DB so UI can show progress
