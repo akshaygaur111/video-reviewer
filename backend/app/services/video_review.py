@@ -30,6 +30,60 @@ from app.services.drive import download_from_drive
 MODEL_NAME = "gemini-2.5-flash"
 
 
+# ── Human-curated issue patterns ──────────────────────────────────────────────
+# Extracted from manual reviews of 20 videos. These teach the model to catch
+# issue types it consistently missed.
+
+HUMAN_FEEDBACK_PATTERNS = """
+KNOWN ISSUE PATTERNS (from past human reviews — actively look for these):
+
+TITLE & TEXT FORMATTING:
+- Colon missing in topic title before subtitle text (e.g. "Comparing Expressions" → "Comparing Expressions: Two Expressions")
+- Ordinal numbers written as abbreviations in on-screen text instead of words (e.g. "5th" should be "fifth")
+
+PRONUNCIATION & LANGUAGE:
+- Decimals spoken as "zero point one" / "zero point zero one" instead of "one tenth" / "one hundredth"
+- Mathematical operation symbols introduced as symbols rather than words (e.g. "+" shown/said instead of "addition")
+- Videos should include at least one example where numbers are written in words (not digits)
+
+PRE-POPULATION ISSUES:
+- Numbers, decimals, or answers appearing on screen before the narrator introduces them
+- All elements should appear progressively as the narrator speaks them — nothing pre-filled
+- Values highlighted or coloured before the narrator discusses them (e.g. answer highlighted from question start)
+
+HIGHLIGHTING & ANIMATION TIMING:
+- Elements highlighted at wrong timestamps (too early or too late relative to narration)
+- Too many colours used simultaneously — cognitive overload for students
+- Over-highlighting of symbols
+- When the focus is on an expression inside parentheses: parentheses must be highlighted, NOT removed
+- Bounding boxes or visual frames appearing before they are introduced in narration
+- Numbers or values highlighted at the wrong moment (e.g. 5 and 12 highlighted before they are referenced)
+
+MATHEMATICAL ACCURACY:
+- Incorrect rounding (verify which digit is used and the rounding direction)
+- Showing intermediate or incorrect values that should not appear (e.g. 3.155 when only 3.15 should be shown)
+- Decimal points not aligned in vertical arithmetic (addition/subtraction columns)
+- Showing a rounded/partial result alongside a full result when only one should be visible
+
+PEDAGOGICAL STRUCTURE:
+- Multiple consecutive examples using the same teaching approach with no variety
+- Examples that appear identical or nearly identical to external sources (e.g. IXL)
+- MCQ / multiple-choice options shown when the student should be guided to construct the answer
+- Examples ordered in wrong difficulty progression (harder before easier)
+- Missing explanation of a core concept that was introduced (e.g. how parentheses change order of operations)
+- Key terms in word problems not highlighted or explained before being used in expressions
+- Numbers taken from a word problem used without describing what each number represents
+
+CONTENT COMPLETENESS & EXAMPLE DIVERSITY:
+- Intro section is unnecessarily long and should be trimmed (flag with start/end timestamps)
+- Placeholder zeros not highlighted or animated when added during decimal operations
+- Number lines missing step-by-step count markers (e.g. counting 1–10 for tenths representation)
+- Diagrams or models too small to be clearly visible to students
+- All examples use only small numbers — at least one example should use large numbers (e.g. 3+ digits before decimal, 4+ after)
+- Examples lack diversity in number types (missing word-form numbers, missing large-scale numbers)
+"""
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def extract_json(text: str) -> List[Dict]:
@@ -56,6 +110,8 @@ def _rigor_prompt(rigor: str, transcript: str) -> str:
 TRANSCRIPT (ground truth for audio):
 {transcript}
 
+{HUMAN_FEEDBACK_PATTERNS}
+
 OUTPUT: Return ONLY a JSON array. Each element must have keys:
   timestamp, category, description, suggestion
 If there are no issues return an empty array [].
@@ -71,6 +127,7 @@ CHECKLIST:
 2. AUDIO-VISUAL MISMATCH — compare what the speaker says (transcript) with what is shown.
 3. GRAMMAR & SPELLING — catch typos in on-screen text or grammatical errors in narration.
 4. LOGICAL FLOW — flag any explanation that is out of order or confusing.
+5. KNOWN PATTERNS — flag any issue matching the KNOWN ISSUE PATTERNS listed above.
 
 Confidence threshold: 90%.
 """
@@ -90,6 +147,7 @@ ENHANCED CHECKLIST:
 6. VISUAL CONTINUITY — elements appearing/disappearing at the wrong moment.
 7. DEFINITION ACCURACY — are technical terms defined correctly?
 8. STEP SKIPPING — any solution steps missing that could confuse students?
+9. KNOWN PATTERNS — re-check every item in the KNOWN ISSUE PATTERNS listed above.
 
 Confidence threshold: 80%.
 """
@@ -111,6 +169,7 @@ MAXIMUM CHECKLIST:
 8. TERMINOLOGY CONSISTENCY — same terms used consistently throughout?
 9. RECORDING ARTIFACTS — visual glitches, cursor distractions, screen artifacts.
 10. CONTENT COMPLETENESS — any concept introduced but not resolved?
+11. KNOWN PATTERNS — apply every item in the KNOWN ISSUE PATTERNS above as an explicit checklist.
 
 Confidence threshold: 70%.
 """
