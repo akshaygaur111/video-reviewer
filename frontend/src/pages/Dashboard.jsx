@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import StatusBadge from '../components/StatusBadge'
 import {
   Plus, Trash2, Send, Film, Clock, CheckCircle, AlertTriangle,
-  ChevronRight, Loader, Video
+  ChevronRight, Loader, Video, GraduationCap, Lightbulb
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -97,6 +97,8 @@ export default function Dashboard() {
   const [loading, setLoading]   = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [links, setLinks]       = useState([''])
+  const [grade, setGrade]       = useState('')
+  const [includeSuggestions, setIncludeSuggestions] = useState(true)
   const intervalRef             = useRef(null)
 
   const fetchJobs = useCallback(async () => {
@@ -145,7 +147,9 @@ export default function Dashboard() {
     if (!clean.length) { toast.error('Add at least one Drive link'); return }
     setSubmitting(true)
     try {
-      const res = await reviewsAPI.create({ drive_links: clean })
+      const payload = { drive_links: clean, include_suggestions: includeSuggestions }
+      if (grade) payload.grade = grade
+      const res = await reviewsAPI.create(payload)
       toast.success(`Review job started for ${clean.length} video${clean.length !== 1 ? 's' : ''}!`)
       setLinks([''])
       await fetchJobs()
@@ -212,6 +216,38 @@ export default function Dashboard() {
               )}
             </div>
           ))}
+
+          {/* Grade + suggestions row */}
+          <div className="flex flex-wrap items-center gap-3 pt-1">
+            {/* Grade selector */}
+            <div className="flex items-center gap-2">
+              <GraduationCap size={14} className="text-slate-500 shrink-0" />
+              <select
+                value={grade}
+                onChange={e => setGrade(e.target.value)}
+                className="input !py-1.5 !px-2.5 text-xs pr-7 appearance-none cursor-pointer min-w-[130px]"
+                style={{ backgroundImage: 'none' }}
+              >
+                <option value="">Grade (optional)</option>
+                <option value="Kindergarten">Kindergarten</option>
+                {[1,2,3,4,5,6,7,8,9,10,11,12].map(g => (
+                  <option key={g} value={`Grade ${g}`}>Grade {g}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Suggestions toggle */}
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <div
+                onClick={() => setIncludeSuggestions(v => !v)}
+                className={`relative w-8 h-4 rounded-full transition-colors duration-200 ${includeSuggestions ? 'bg-violet-600' : 'bg-slate-600'}`}
+              >
+                <span className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform duration-200 ${includeSuggestions ? 'translate-x-4' : ''}`} />
+              </div>
+              <Lightbulb size={13} className={includeSuggestions ? 'text-violet-400' : 'text-slate-500'} />
+              <span className="text-xs text-slate-400">Include suggestions</span>
+            </label>
+          </div>
 
           <div className="flex gap-3 pt-1">
             {links.length < 50 && (

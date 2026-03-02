@@ -103,6 +103,35 @@ REVIEW DIMENSIONS — apply all of these to every video regardless of topic:
     Flag anything that is shown or mentioned but not explained, any steps that
     are skipped without acknowledgement, and any visual elements that appear
     without context.
+
+11. PEDAGOGICAL FLOW & SEQUENCING
+    Evaluate whether the order of instruction supports understanding:
+    - New concepts must be introduced only after prerequisite knowledge has been
+      activated or recalled — not assumed silently.
+    - When a problem is stated (e.g. "A × B"), the visual demonstration must
+      follow the same conceptual order. Demonstrating "B of A" when the problem
+      says "A × B" reverses the stated order and forces unnecessary cognitive
+      re-mapping; flag this as a sequencing issue.
+    - Guided worked examples must come before independent practice. Students
+      should not be asked to solve a problem type they have not yet been shown.
+    - Concrete representations (physical, visual, numerical) should precede
+      abstract ones (formulas, symbols). Flag premature abstraction.
+    - Difficulty should increase gradually — flag any jump where a harder
+      variant is introduced without adequate scaffolding from an easier one.
+
+12. COGNITIVE LOAD MANAGEMENT
+    Assess whether the video respects the limits of working memory:
+    - No more than 2–3 new concepts or procedural steps should appear in rapid
+      succession without a pause, summary, or consolidation moment.
+    - On-screen elements visible simultaneously should reflect only what the
+      narrator is currently addressing. Surplus simultaneous elements (labels,
+      numbers, highlights) compete for attention and should be flagged.
+    - Each step must be fully resolved and removed or de-emphasised before the
+      next step is introduced — avoid layering unresolved information.
+    - Pacing must allow enough time for the target learner to absorb each idea
+      before the next arrives; flag sections that are rushed.
+    - Transitional summaries or recaps after multi-step sequences are expected;
+      flag their absence when the preceding content was complex.
 """
 
 
@@ -127,15 +156,33 @@ def extract_json(text: str) -> List[Dict]:
     return []
 
 
-def _rigor_prompt(rigor: str, transcript: str) -> str:
+def _rigor_prompt(
+    rigor: str,
+    transcript: str,
+    grade: Optional[str] = None,
+    include_suggestions: bool = True,
+) -> str:
+    grade_block = ""
+    if grade:
+        grade_block = f"""
+GRADE CONTEXT: This video is designed for {grade} students.
+Calibrate your assessment accordingly:
+- Use age-appropriate expectations for vocabulary, concept complexity, and prior knowledge.
+- Flag pacing or cognitive load issues that would be problematic specifically for {grade} learners.
+- Sequencing issues (e.g. skipped scaffolding, premature abstraction) should be judged relative to what {grade} students can reasonably be expected to know.
+"""
+
+    output_keys = "timestamp, category, description, suggestion" if include_suggestions else "timestamp, category, description"
+    suggestion_note = "" if include_suggestions else "\n  Do NOT include a 'suggestion' key — omit it entirely."
+
     base = f"""
 TRANSCRIPT (ground truth for audio):
 {transcript}
-
+{grade_block}
 {REVIEW_DIMENSIONS}
 
 OUTPUT: Return ONLY a JSON array. Each element must have keys:
-  timestamp, category, description, suggestion
+  {output_keys}{suggestion_note}
 If there are no issues return an empty array [].
 """
     if rigor == "standard":
@@ -144,7 +191,7 @@ You are a Senior QA Specialist reviewing an educational video.
 
 {base}
 
-Apply all 10 REVIEW DIMENSIONS above. Confidence threshold: 90%.
+Apply all 12 REVIEW DIMENSIONS above. Confidence threshold: 90%.
 """
     elif rigor == "enhanced":
         return f"""
@@ -153,11 +200,13 @@ The previous review found ZERO issues, so you must look DEEPER.
 
 {base}
 
-Apply all 10 REVIEW DIMENSIONS above with extra focus on:
+Apply all 12 REVIEW DIMENSIONS above with extra focus on:
 - Subtle timing gaps (even 1–2 seconds) between audio and visual.
 - Inconsistencies in how terms or values are written vs spoken.
 - Elements appearing or disappearing at the wrong moment.
 - Steps skipped without acknowledgement.
+- Sequencing issues: does the visual order match the stated problem order?
+- Cognitive load: are too many elements on screen simultaneously?
 
 Confidence threshold: 80%.
 """
@@ -168,12 +217,14 @@ Two previous reviews found ZERO issues. Apply MAXIMUM scrutiny.
 
 {base}
 
-Apply all 10 REVIEW DIMENSIONS above as an explicit checklist. Additionally:
+Apply all 12 REVIEW DIMENSIONS above as an explicit checklist. Additionally:
 - Frame-level accuracy: every value and symbol visible on screen.
 - Font, contrast, and readability for all learners.
 - Recording artifacts: glitches, stray cursors, screen transitions.
 - Pacing: is the narrator too fast or too slow at any point?
 - Terminology consistency throughout the entire video.
+- Pedagogical sequencing: does every demonstration follow the stated problem order?
+- Working memory: count simultaneous on-screen elements at each step.
 
 Confidence threshold: 70%.
 """
@@ -218,9 +269,11 @@ async def _run_pass(
     pass_number: int,
     rigor: str,
     transcript: str,
+    grade: Optional[str] = None,
+    include_suggestions: bool = True,
 ) -> Dict:
     temperature = {"standard": 0.10, "enhanced": 0.05, "maximum": 0.01}[rigor]
-    prompt = _rigor_prompt(rigor, transcript)
+    prompt = _rigor_prompt(rigor, transcript, grade=grade, include_suggestions=include_suggestions)
     loop = asyncio.get_running_loop()
 
     config = types.GenerateContentConfig(
@@ -251,6 +304,8 @@ async def _process_single_video(
     video_index: int,
     drive_link: str,
     api_key: str,
+    grade: Optional[str] = None,
+    include_suggestions: bool = True,
 ):
     db = get_db()
     video_path = None
@@ -318,7 +373,7 @@ async def _process_single_video(
             print(
                 f"[Job {job_id}] Video {video_index}: Pass {pass_num} ({rigor})..."
             )
-            result = await _run_pass(client, video_file, pass_num, rigor, transcript)
+            result = await _run_pass(client, video_file, pass_num, rigor, transcript, grade=grade, include_suggestions=include_suggestions)
             passes.append(result)
 
             # Stream pass result into DB so UI can show progress
@@ -379,7 +434,13 @@ async def _process_single_video(
                 pass
 
 
-async def process_review_job(job_id: str, drive_links: List[str], api_key: str):
+async def process_review_job(
+    job_id: str,
+    drive_links: List[str],
+    api_key: str,
+    grade: Optional[str] = None,
+    include_suggestions: bool = True,
+):
     """
     Entry point for background processing.
     Videos are processed sequentially (one at a time); each video runs its 3 passes sequentially.
@@ -392,7 +453,7 @@ async def process_review_job(job_id: str, drive_links: List[str], api_key: str):
     print(f"[Job {job_id}] Starting — {len(drive_links)} video(s)")
 
     for i, link in enumerate(drive_links):
-        await _process_single_video(job_id, i, link, api_key)
+        await _process_single_video(job_id, i, link, api_key, grade=grade, include_suggestions=include_suggestions)
 
     # Determine final status
     job = await db.jobs.find_one({"_id": ObjectId(job_id)})

@@ -29,6 +29,8 @@ class TokenResponse(BaseModel):
 class ReviewJobCreate(BaseModel):
     drive_links: List[str] = Field(..., min_length=1, max_length=50)
     job_name: Optional[str] = Field(None, max_length=100)
+    grade: Optional[str] = Field(None, max_length=50)   # e.g. "Grade 3", "Grade 5"
+    include_suggestions: bool = True
 
 
 class PassResult(BaseModel):
@@ -62,3 +64,5 @@ class ReviewJob(BaseModel):
     total_videos: int = 0
     completed_videos: int = 0
     total_issues: int = 0
+    grade: Optional[str] = None
+    include_suggestions: bool = True

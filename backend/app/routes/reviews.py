@@ -77,12 +77,21 @@ async def create_review_job(
         "total_videos": len(job_data.drive_links),
         "completed_videos": 0,
         "total_issues": 0,
+        "grade": job_data.grade,
+        "include_suggestions": job_data.include_suggestions,
     }
 
     result = await db.jobs.insert_one(job_doc)
     job_id = str(result.inserted_id)
 
-    background_tasks.add_task(process_review_job, job_id, job_data.drive_links, api_key)
+    background_tasks.add_task(
+        process_review_job,
+        job_id,
+        job_data.drive_links,
+        api_key,
+        grade=job_data.grade,
+        include_suggestions=job_data.include_suggestions,
+    )
 
     return {
         "job_id": job_id,
