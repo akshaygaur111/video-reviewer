@@ -79,6 +79,8 @@ async def create_review_job(
         "total_issues": 0,
         "grade": job_data.grade,
         "include_suggestions": job_data.include_suggestions,
+        "reference_drive_link": job_data.reference_drive_link,
+        "reference_analysis": None,
     }
 
     result = await db.jobs.insert_one(job_doc)
@@ -91,6 +93,7 @@ async def create_review_job(
         api_key,
         grade=job_data.grade,
         include_suggestions=job_data.include_suggestions,
+        reference_drive_link=job_data.reference_drive_link,
     )
 
     return {

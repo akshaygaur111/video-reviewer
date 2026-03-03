@@ -31,6 +31,7 @@ class ReviewJobCreate(BaseModel):
     job_name: Optional[str] = Field(None, max_length=100)
     grade: Optional[str] = Field(None, max_length=50)   # e.g. "Grade 3", "Grade 5"
     include_suggestions: bool = True
+    reference_drive_link: Optional[str] = Field(None, max_length=500)  # e.g. IXL video link
 
 
 class PassResult(BaseModel):
@@ -66,3 +67,5 @@ class ReviewJob(BaseModel):
     total_issues: int = 0
     grade: Optional[str] = None
     include_suggestions: bool = True
+    reference_drive_link: Optional[str] = None
+    reference_analysis: Optional[Dict[str, Any]] = None  # Phase 0 result

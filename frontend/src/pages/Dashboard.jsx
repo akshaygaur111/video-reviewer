@@ -5,7 +5,8 @@ import { useAuth } from '../contexts/AuthContext'
 import StatusBadge from '../components/StatusBadge'
 import {
   Plus, Trash2, Send, Film, Clock, CheckCircle, AlertTriangle,
-  ChevronRight, Loader, Video, GraduationCap, Lightbulb
+  ChevronRight, Loader, Video, GraduationCap, Lightbulb,
+  BookOpen, ChevronDown, ChevronUp, Link
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -99,6 +100,8 @@ export default function Dashboard() {
   const [links, setLinks]       = useState([''])
   const [grade, setGrade]       = useState('')
   const [includeSuggestions, setIncludeSuggestions] = useState(true)
+  const [referenceLink, setReferenceLink] = useState('')
+  const [showReference, setShowReference] = useState(false)
   const intervalRef             = useRef(null)
 
   const fetchJobs = useCallback(async () => {
@@ -149,6 +152,7 @@ export default function Dashboard() {
     try {
       const payload = { drive_links: clean, include_suggestions: includeSuggestions }
       if (grade) payload.grade = grade
+      if (referenceLink.trim()) payload.reference_drive_link = referenceLink.trim()
       const res = await reviewsAPI.create(payload)
       toast.success(`Review job started for ${clean.length} video${clean.length !== 1 ? 's' : ''}!`)
       setLinks([''])
@@ -247,6 +251,60 @@ export default function Dashboard() {
               <Lightbulb size={13} className={includeSuggestions ? 'text-violet-400' : 'text-slate-500'} />
               <span className="text-xs text-slate-400">Include suggestions</span>
             </label>
+          </div>
+
+          {/* Reference video toggle */}
+          <div className="border border-dashed border-slate-700 rounded-xl overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowReference(v => !v)}
+              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left hover:bg-slate-800/40 transition-colors"
+            >
+              <BookOpen size={14} className="text-cyan-400 shrink-0" />
+              <span className="text-xs font-medium text-slate-300">Compare with Reference Video</span>
+              <span className="text-xs text-slate-500 ml-1">(e.g. IXL benchmark)</span>
+              {showReference
+                ? <ChevronUp size={13} className="ml-auto text-slate-500" />
+                : <ChevronDown size={13} className="ml-auto text-slate-500" />
+              }
+            </button>
+
+            {showReference && (
+              <div className="px-4 pb-4 pt-1 space-y-2.5 border-t border-slate-700/50">
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  The AI will first deeply analyse the reference video — every concept taught,
+                  the pedagogy, sequencing, and even small details. It will then review your
+                  video with the goal of matching the reference's scope while flagging where
+                  yours can <span className="text-cyan-400 font-medium">go beyond it</span>.
+                </p>
+                <div className="flex items-center gap-2">
+                  <Link size={13} className="text-slate-500 shrink-0" />
+                  <input
+                    type="url"
+                    value={referenceLink}
+                    onChange={e => setReferenceLink(e.target.value)}
+                    placeholder="https://drive.google.com/file/d/…/view  (reference video)"
+                    className="input flex-1 font-mono text-xs"
+                  />
+                  {referenceLink && (
+                    <button
+                      type="button"
+                      onClick={() => setReferenceLink('')}
+                      className="btn-ghost !px-2 text-slate-500 hover:text-red-400"
+                      title="Clear reference link"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
+                </div>
+                {referenceLink && (
+                  <p className="text-xs text-cyan-400/80 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 inline-block" />
+                    Reference video set — Phase 0 analysis will run before the review
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="flex gap-3 pt-1">

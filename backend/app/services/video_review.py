@@ -30,6 +30,70 @@ from app.services.drive import download_from_drive
 MODEL_NAME = "gemini-2.5-flash"
 
 
+# ── Reference video analysis prompt ───────────────────────────────────────────
+
+REFERENCE_ANALYSIS_PROMPT = """
+You are a master educational content analyst. Your task is to meticulously analyse
+this reference video and extract EVERY detail about its pedagogical content,
+structure, and teaching approach. Leave nothing out — even small details matter.
+
+Extract and return a JSON object with the following keys:
+
+{
+  "topic": "The precise topic and subtopic of the video (e.g. 'Multiplying fractions by whole numbers')",
+  "concepts_covered": [
+    "Exhaustive list — every concept, sub-concept, or idea introduced, even briefly.
+     Include the specific order they appear in. E.g.:
+     '1. Recap: what a fraction means (numerator/denominator)',
+     '2. What it means to multiply a fraction by a whole number',
+     '3. Visual model: repeated addition of fractions',
+     ..."
+  ],
+  "examples_used": [
+    "List every example worked through, with exact values. E.g.:
+     '1/3 × 4 = 4/3',
+     '2/5 × 3 = 6/5 (simplified to 1 1/5)',
+     ..."
+  ],
+  "pedagogical_approach": {
+    "intro_style": "How the video opens — recap, hook, direct statement of topic, etc.",
+    "teaching_method": "Direct instruction / guided discovery / worked examples / visual model / etc.",
+    "scaffolding": "How the video builds from simple to complex — describe the progression",
+    "difficulty_progression": "Describe how the examples increase in difficulty",
+    "conclusion_style": "How the video closes — summary, call to action, recap, etc."
+  },
+  "sequencing": [
+    "Step-by-step ordered list of what happens in the video, with approximate timestamps.
+     E.g.: '0:00-0:15 — Title card and topic introduction',
+           '0:15-0:45 — Recap of fraction basics',
+           '0:45-2:00 — First worked example: 1/3 × 4', ..."
+  ],
+  "visual_style": {
+    "highlighting_technique": "How elements are highlighted or emphasised on screen",
+    "progressive_reveal": "Does the video reveal content step by step or show all at once?",
+    "colour_usage": "How colour is used to distinguish elements",
+    "animation_style": "What kind of animations or transitions are used"
+  },
+  "key_vocabulary": [
+    "Every domain-specific term introduced or used in the video"
+  ],
+  "small_but_important_details": [
+    "Any specific notation choices, formatting conventions, verbal phrasing patterns,
+     or unique pedagogical moves that a competing video should match or improve upon.
+     E.g.: 'Always says the full fraction name before writing it',
+           'Uses a number line to verify results',
+           'Explicitly tells students to simplify at the end'..."
+  ],
+  "scope_boundaries": {
+    "what_is_included": "Clear statement of what the video DOES cover",
+    "what_is_excluded": "Concepts deliberately left out or mentioned as out-of-scope"
+  }
+}
+
+Output ONLY the JSON object. No other text.
+"""
+
+
 # ── Universal review dimensions ───────────────────────────────────────────────
 # These are topic-agnostic aspects every educational video should be checked
 # against, regardless of subject matter.
@@ -156,6 +220,48 @@ def extract_json(text: str) -> List[Dict]:
     return []
 
 
+def _format_reference_block(reference_analysis: Dict) -> str:
+    """Build the reference comparison context block injected into review prompts."""
+    import json as _json
+    ref_json = _json.dumps(reference_analysis, indent=2)
+    return f"""
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFERENCE VIDEO ANALYSIS (IXL / Benchmark)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{ref_json}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+COMPARISON MISSION:
+Your goal is to help make the submitted video BETTER THAN the reference above,
+while staying within the SAME scope and pedagogical framework.
+
+When reviewing the submitted video, additionally flag:
+
+A) SCOPE GAPS — concepts or sub-topics covered in the reference that the
+   submitted video MISSES entirely or handles incompletely. Use category
+   "Scope Gap" for these issues.
+
+B) PEDAGOGICAL DEVIATIONS — places where the submitted video uses a
+   teaching approach that differs from the reference in ways likely to be
+   LESS effective (wrong order, skipped scaffolding, different difficulty
+   progression). Use category "Pedagogy" for these.
+
+C) IMPROVEMENT OPPORTUNITIES — places where the submitted video COULD do
+   better than the reference (clearer visual, better pacing, richer example
+   variety). Use category "Enhancement" for these. These are positive flags —
+   not errors, but upgrade suggestions.
+
+D) SCOPE OVERREACH — if the submitted video introduces content BEYOND the
+   reference's scope_boundaries.what_is_included, flag it so the team can
+   decide whether to keep or trim it. Use category "Scope Overreach".
+
+IMPORTANT: The 12 standard review dimensions still apply fully — do not
+skip them just because a reference is present. The reference context is
+ADDITIVE to the normal review.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+"""
+
+
 def _format_prior_issues(previous_passes: List[Dict]) -> str:
     """Flatten issues from all previous passes into a readable summary."""
     items = []
@@ -174,6 +280,7 @@ def _rigor_prompt(
     grade: Optional[str] = None,
     include_suggestions: bool = True,
     previous_passes: Optional[List[Dict]] = None,
+    reference_analysis: Optional[Dict] = None,
 ) -> str:
     previous_passes = previous_passes or []
 
@@ -200,6 +307,10 @@ ISSUES ALREADY REPORTED BY PREVIOUS PASSES ({total_prior} total — do NOT repea
 Your task: find issues that the previous pass(es) MISSED. Look for different dimensions,
 different timestamps, and subtler defects not yet captured above.
 """
+
+    reference_block = ""
+    if reference_analysis:
+        reference_block = _format_reference_block(reference_analysis)
 
     checklist = """
 MANDATORY ANALYSIS METHOD — work through EVERY dimension below BEFORE writing your JSON:
@@ -229,7 +340,7 @@ VISUAL ACCURACY REQUIREMENT:
     base = f"""
 TRANSCRIPT (ground truth for audio):
 {transcript}
-{grade_block}{prior_block}
+{grade_block}{reference_block}{prior_block}
 {REVIEW_DIMENSIONS}
 {checklist}
 OUTPUT: First briefly note (one line per dimension) whether each of the 12 dimensions is clean or has issues.
@@ -337,6 +448,7 @@ async def _run_pass(
     grade: Optional[str] = None,
     include_suggestions: bool = True,
     previous_passes: Optional[List[Dict]] = None,
+    reference_analysis: Optional[Dict] = None,
 ) -> Dict:
     temperature = {"standard": 0.10, "enhanced": 0.05, "maximum": 0.01}[rigor]
     prompt = _rigor_prompt(
@@ -344,6 +456,7 @@ async def _run_pass(
         grade=grade,
         include_suggestions=include_suggestions,
         previous_passes=previous_passes or [],
+        reference_analysis=reference_analysis,
     )
     loop = asyncio.get_running_loop()
 
@@ -370,6 +483,113 @@ async def _run_pass(
     }
 
 
+async def _analyze_reference_video(
+    client: genai.Client,
+    drive_link: str,
+    job_id: str,
+) -> Dict:
+    """
+    Phase 0 — Download and deeply analyse the reference (benchmark) video.
+    Returns a structured dict describing its pedagogy, scope, concepts, and style.
+    Stores the result in the job document under 'reference_analysis'.
+    """
+    db = get_db()
+    loop = asyncio.get_running_loop()
+    video_path = None
+    video_file = None
+
+    await db.jobs.update_one(
+        {"_id": ObjectId(job_id)},
+        {"$set": {"reference_analysis_status": "analyzing"}},
+    )
+
+    try:
+        print(f"[Job {job_id}] Reference video: downloading...")
+        video_path = await loop.run_in_executor(None, lambda: download_from_drive(drive_link))
+
+        print(f"[Job {job_id}] Reference video: uploading to Gemini...")
+        video_file = await loop.run_in_executor(
+            None, lambda: client.files.upload(file=video_path)
+        )
+
+        while video_file.state.name == "PROCESSING":
+            await asyncio.sleep(3)
+            file_name = video_file.name
+            video_file = await loop.run_in_executor(
+                None, lambda: client.files.get(name=file_name)
+            )
+
+        if video_file.state.name == "FAILED":
+            raise RuntimeError("Gemini file processing failed for reference video")
+
+        print(f"[Job {job_id}] Reference video: running deep analysis...")
+        response = await loop.run_in_executor(
+            None,
+            lambda: client.models.generate_content(
+                model=MODEL_NAME,
+                contents=[video_file, REFERENCE_ANALYSIS_PROMPT],
+                config=types.GenerateContentConfig(
+                    temperature=0.05,
+                    top_p=0.95,
+                    max_output_tokens=8192,
+                ),
+            ),
+        )
+
+        # Parse JSON from response
+        analysis = {}
+        fence = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", response.text)
+        if fence:
+            try:
+                analysis = json.loads(fence.group(1))
+            except Exception:
+                pass
+        if not analysis:
+            obj = re.search(r"\{[\s\S]*\}", response.text)
+            if obj:
+                try:
+                    analysis = json.loads(obj.group())
+                except Exception:
+                    pass
+        if not analysis:
+            analysis = {"raw": response.text}
+
+        await db.jobs.update_one(
+            {"_id": ObjectId(job_id)},
+            {
+                "$set": {
+                    "reference_analysis": analysis,
+                    "reference_analysis_status": "completed",
+                }
+            },
+        )
+        print(f"[Job {job_id}] Reference video: analysis complete.")
+        return analysis
+
+    except Exception as exc:
+        print(f"[Job {job_id}] Reference video analysis failed: {exc}")
+        traceback.print_exc()
+        await db.jobs.update_one(
+            {"_id": ObjectId(job_id)},
+            {"$set": {"reference_analysis_status": "failed", "reference_analysis_error": str(exc)}},
+        )
+        return {}
+
+    finally:
+        if video_file and client:
+            try:
+                file_name = video_file.name
+                loop = asyncio.get_running_loop()
+                await loop.run_in_executor(None, lambda: client.files.delete(name=file_name))
+            except Exception:
+                pass
+        if video_path and os.path.exists(video_path):
+            try:
+                os.remove(video_path)
+            except Exception:
+                pass
+
+
 async def _process_single_video(
     job_id: str,
     video_index: int,
@@ -377,6 +597,7 @@ async def _process_single_video(
     api_key: str,
     grade: Optional[str] = None,
     include_suggestions: bool = True,
+    reference_analysis: Optional[Dict] = None,
 ):
     db = get_db()
     video_path = None
@@ -449,6 +670,7 @@ async def _process_single_video(
                 grade=grade,
                 include_suggestions=include_suggestions,
                 previous_passes=passes,   # passes accumulated so far
+                reference_analysis=reference_analysis,
             )
             passes.append(result)
 
@@ -516,9 +738,12 @@ async def process_review_job(
     api_key: str,
     grade: Optional[str] = None,
     include_suggestions: bool = True,
+    reference_drive_link: Optional[str] = None,
 ):
     """
     Entry point for background processing.
+    If a reference_drive_link is provided, Phase 0 analyses it first and the
+    resulting analysis is injected into every video's 3-pass review prompts.
     Videos are processed sequentially (one at a time); each video runs its 3 passes sequentially.
     """
     db = get_db()
@@ -528,8 +753,20 @@ async def process_review_job(
 
     print(f"[Job {job_id}] Starting — {len(drive_links)} video(s)")
 
+    # ── Phase 0: Reference video analysis (optional) ──────────────────────────
+    reference_analysis: Optional[Dict] = None
+    if reference_drive_link:
+        print(f"[Job {job_id}] Phase 0: analysing reference video...")
+        client = genai.Client(api_key=api_key)
+        reference_analysis = await _analyze_reference_video(client, reference_drive_link, job_id)
+
     for i, link in enumerate(drive_links):
-        await _process_single_video(job_id, i, link, api_key, grade=grade, include_suggestions=include_suggestions)
+        await _process_single_video(
+            job_id, i, link, api_key,
+            grade=grade,
+            include_suggestions=include_suggestions,
+            reference_analysis=reference_analysis,
+        )
 
     # Determine final status
     job = await db.jobs.find_one({"_id": ObjectId(job_id)})

@@ -3,8 +3,172 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { reviewsAPI } from '../api/client'
 import StatusBadge from '../components/StatusBadge'
 import VideoReviewCard from '../components/VideoReviewCard'
-import { ArrowLeft, RefreshCw, BarChart3, Film } from 'lucide-react'
+import { ArrowLeft, RefreshCw, BarChart3, Film, BookOpen, ChevronDown, ChevronUp, Loader } from 'lucide-react'
 import toast from 'react-hot-toast'
+
+function ReferenceAnalysisCard({ job }) {
+  const [expanded, setExpanded] = useState(false)
+
+  if (!job.reference_drive_link) return null
+
+  const status = job.reference_analysis_status
+  const analysis = job.reference_analysis
+
+  return (
+    <div className="glass border border-cyan-500/20 rounded-2xl overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center gap-3 px-5 py-4">
+        <div className="w-9 h-9 rounded-xl bg-cyan-500/15 flex items-center justify-center shrink-0">
+          <BookOpen size={16} className="text-cyan-400" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-white">Phase 0 — Reference Video Analysis</p>
+          <p className="text-xs text-slate-500 truncate">
+            {status === 'analyzing'
+              ? 'Analysing benchmark video…'
+              : status === 'completed'
+              ? 'IXL benchmark analysed — informing the review'
+              : status === 'failed'
+              ? 'Reference analysis failed — review continues without it'
+              : 'Queued'}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {status === 'analyzing' && (
+            <Loader size={15} className="text-cyan-400 animate-spin" />
+          )}
+          {status === 'completed' && (
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-400">Done</span>
+          )}
+          {status === 'failed' && (
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-500/15 text-red-400">Failed</span>
+          )}
+          {analysis && (
+            <button
+              onClick={() => setExpanded(v => !v)}
+              className="btn-ghost !px-2 !py-1"
+              title={expanded ? 'Collapse' : 'Expand'}
+            >
+              {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Expanded details */}
+      {expanded && analysis && !analysis.raw && (
+        <div className="border-t border-slate-700/50 px-5 py-4 space-y-4 text-xs">
+          {/* Topic */}
+          {analysis.topic && (
+            <div>
+              <p className="text-slate-500 font-semibold uppercase tracking-wide mb-1">Topic</p>
+              <p className="text-slate-200">{analysis.topic}</p>
+            </div>
+          )}
+
+          {/* Concepts covered */}
+          {analysis.concepts_covered?.length > 0 && (
+            <div>
+              <p className="text-slate-500 font-semibold uppercase tracking-wide mb-1.5">Concepts Covered</p>
+              <ul className="space-y-1">
+                {analysis.concepts_covered.map((c, i) => (
+                  <li key={i} className="flex gap-2 text-slate-300">
+                    <span className="text-cyan-500 shrink-0">•</span>
+                    <span>{c}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Examples */}
+          {analysis.examples_used?.length > 0 && (
+            <div>
+              <p className="text-slate-500 font-semibold uppercase tracking-wide mb-1.5">Examples Used</p>
+              <ul className="space-y-1">
+                {analysis.examples_used.map((ex, i) => (
+                  <li key={i} className="flex gap-2 text-slate-300 font-mono">
+                    <span className="text-cyan-500 shrink-0">{i + 1}.</span>
+                    <span>{ex}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Pedagogical approach */}
+          {analysis.pedagogical_approach && (
+            <div>
+              <p className="text-slate-500 font-semibold uppercase tracking-wide mb-1.5">Pedagogical Approach</p>
+              <div className="space-y-1.5">
+                {Object.entries(analysis.pedagogical_approach).map(([k, v]) => (
+                  <div key={k} className="flex gap-2">
+                    <span className="text-slate-500 capitalize shrink-0 min-w-[130px]">{k.replace(/_/g, ' ')}:</span>
+                    <span className="text-slate-300">{v}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Key vocabulary */}
+          {analysis.key_vocabulary?.length > 0 && (
+            <div>
+              <p className="text-slate-500 font-semibold uppercase tracking-wide mb-1.5">Key Vocabulary</p>
+              <div className="flex flex-wrap gap-1.5">
+                {analysis.key_vocabulary.map((w, i) => (
+                  <span key={i} className="px-2 py-0.5 rounded-full bg-slate-700/60 text-slate-300">{w}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Scope boundaries */}
+          {analysis.scope_boundaries && (
+            <div>
+              <p className="text-slate-500 font-semibold uppercase tracking-wide mb-1.5">Scope</p>
+              {analysis.scope_boundaries.what_is_included && (
+                <p className="text-slate-300 mb-1">
+                  <span className="text-emerald-400 font-semibold">Includes: </span>
+                  {analysis.scope_boundaries.what_is_included}
+                </p>
+              )}
+              {analysis.scope_boundaries.what_is_excluded && (
+                <p className="text-slate-300">
+                  <span className="text-slate-500 font-semibold">Excludes: </span>
+                  {analysis.scope_boundaries.what_is_excluded}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Small details */}
+          {analysis.small_but_important_details?.length > 0 && (
+            <div>
+              <p className="text-slate-500 font-semibold uppercase tracking-wide mb-1.5">Small but Important Details</p>
+              <ul className="space-y-1">
+                {analysis.small_but_important_details.map((d, i) => (
+                  <li key={i} className="flex gap-2 text-slate-300">
+                    <span className="text-amber-400 shrink-0">★</span>
+                    <span>{d}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Raw fallback */}
+      {expanded && analysis?.raw && (
+        <div className="border-t border-slate-700/50 px-5 py-4">
+          <pre className="text-xs text-slate-400 whitespace-pre-wrap">{analysis.raw}</pre>
+        </div>
+      )}
+    </div>
+  )
+}
+
 
 function OverallProgress({ job }) {
   const pct = job.total_videos > 0
@@ -139,6 +303,13 @@ export default function JobDetail() {
       <div className="animate-slide-up" style={{ animationDelay: '60ms' }}>
         <OverallProgress job={job} />
       </div>
+
+      {/* Reference analysis card (Phase 0) */}
+      {job.reference_drive_link && (
+        <div className="animate-slide-up" style={{ animationDelay: '90ms' }}>
+          <ReferenceAnalysisCard job={job} />
+        </div>
+      )}
 
       {/* Active indicator banner */}
       {(job.status === 'processing' || job.status === 'pending') && (
