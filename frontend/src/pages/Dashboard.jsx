@@ -64,7 +64,7 @@ function JobRow({ job, onClick, username }) {
           )}
           <span>{job.total_videos} video{job.total_videos !== 1 ? 's' : ''}</span>
           <span>•</span>
-          <span>{new Date(job.created_at).toLocaleDateString()} {new Date(job.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+          <span>{new Date(job.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })} IST</span>
           {job.status === 'completed' && (
             <>
               <span>•</span>

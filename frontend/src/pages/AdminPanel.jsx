@@ -295,7 +295,7 @@ export default function AdminPanel() {
                       {u.role}
                     </span>
                     <span className="text-xs text-slate-600">
-                      {u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}
+                      {u.created_at ? new Date(u.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
                     </span>
                   </div>
                 ))}
