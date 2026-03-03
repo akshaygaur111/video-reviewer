@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronDown, ChevronUp, Link2, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { ChevronDown, ChevronUp, Link2, AlertCircle, CheckCircle2, Calculator, Mic, BookOpen } from 'lucide-react'
 import StatusBadge from './StatusBadge'
 import ProgressRigor from './ProgressRigor'
 import IssueCard from './IssueCard'
@@ -26,10 +26,120 @@ function shortLink(url) {
   }
 }
 
+// Category metadata for bucket tabs
+const CAT_META = {
+  'Math':         { icon: Calculator,   text: 'text-red-400',    bg: 'bg-red-500/12',    activeBg: 'bg-red-500/25',    border: 'border-red-500/30',    activeBorder: 'border-red-400/60' },
+  'Audio-Visual': { icon: Mic,          text: 'text-amber-400',  bg: 'bg-amber-500/12',  activeBg: 'bg-amber-500/25',  border: 'border-amber-500/30',  activeBorder: 'border-amber-400/60' },
+  'Grammar':      { icon: BookOpen,     text: 'text-blue-400',   bg: 'bg-blue-500/12',   activeBg: 'bg-blue-500/25',   border: 'border-blue-500/30',   activeBorder: 'border-blue-400/60' },
+  'Logic':        { icon: AlertCircle,  text: 'text-purple-400', bg: 'bg-purple-500/12', activeBg: 'bg-purple-500/25', border: 'border-purple-500/30', activeBorder: 'border-purple-400/60' },
+}
+const OTHER_META = { icon: AlertCircle, text: 'text-slate-400', bg: 'bg-slate-700/30', activeBg: 'bg-slate-600/40', border: 'border-slate-600/30', activeBorder: 'border-slate-500/60' }
+
+function getCatKey(category = '') {
+  for (const key of Object.keys(CAT_META)) {
+    if (category.toLowerCase().includes(key.toLowerCase())) return key
+  }
+  return 'Other'
+}
+
+function IssueBuckets({ issues }) {
+  const [active, setActive] = useState('All')
+
+  const sorted = [...issues].sort((a, b) => tsToSec(a.timestamp) - tsToSec(b.timestamp))
+
+  // Build ordered category list (preserve insertion order, All first)
+  const counts = {}
+  sorted.forEach(issue => {
+    const k = getCatKey(issue.category)
+    counts[k] = (counts[k] || 0) + 1
+  })
+  const cats = Object.keys(counts)
+
+  const displayed = active === 'All' ? sorted : sorted.filter(i => getCatKey(i.category) === active)
+
+  return (
+    <div className="space-y-3">
+      {/* Category tab strip */}
+      <div className="flex flex-wrap gap-2">
+        {/* All tab */}
+        {(() => {
+          const isActive = active === 'All'
+          return (
+            <button
+              onClick={() => setActive('All')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                isActive
+                  ? 'bg-slate-600/50 border-slate-400/60 text-white'
+                  : 'bg-slate-700/25 border-slate-600/30 text-slate-400 hover:text-slate-200 hover:border-slate-500/50'
+              }`}
+            >
+              All
+              <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${isActive ? 'bg-white/15 text-white' : 'bg-slate-600/40 text-slate-400'}`}>
+                {issues.length}
+              </span>
+            </button>
+          )
+        })()}
+
+        {/* Per-category tabs */}
+        {cats.map(cat => {
+          const meta = CAT_META[cat] ?? OTHER_META
+          const Icon = meta.icon
+          const isActive = active === cat
+          return (
+            <button
+              key={cat}
+              onClick={() => setActive(cat)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                isActive
+                  ? `${meta.activeBg} ${meta.activeBorder} ${meta.text}`
+                  : `${meta.bg} ${meta.border} ${meta.text} opacity-70 hover:opacity-100`
+              }`}
+            >
+              <Icon size={11} />
+              {cat}
+              <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${isActive ? 'bg-white/15' : 'bg-white/8'}`}>
+                {counts[cat]}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Mini category breakdown bar */}
+      {cats.length > 1 && (
+        <div className="flex h-1 rounded-full overflow-hidden gap-px">
+          {cats.map(cat => {
+            const meta = CAT_META[cat] ?? OTHER_META
+            const pct = (counts[cat] / issues.length) * 100
+            // Extract color from text class for background
+            const barColor = meta.text.replace('text-', 'bg-').replace('/400', '/50')
+            return (
+              <div
+                key={cat}
+                className={`h-full transition-all ${barColor} ${active === cat ? 'opacity-100' : active === 'All' ? 'opacity-70' : 'opacity-25'}`}
+                style={{ width: `${pct}%` }}
+                title={`${cat}: ${counts[cat]}`}
+              />
+            )
+          })}
+        </div>
+      )}
+
+      {/* Issue list */}
+      <div className="space-y-2">
+        {displayed.map((issue, i) => (
+          <IssueCard key={`${active}-${i}`} issue={issue} index={i} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function VideoReviewCard({ video, globalIndex }) {
   const [expanded, setExpanded] = useState(video.status === 'processing')
 
-  const hasIssues   = (video.combined_issues ?? []).length > 0
+  const hasIssues    = (video.combined_issues ?? []).length > 0
   const isProcessing = video.status === 'processing'
   const isPending    = video.status === 'pending'
 
@@ -81,7 +191,7 @@ export default function VideoReviewCard({ video, globalIndex }) {
         </div>
 
         {/* Expand toggle */}
-        {(expanded ? <ChevronUp size={16} className="text-slate-500" /> : <ChevronDown size={16} className="text-slate-500" />)}
+        {expanded ? <ChevronUp size={16} className="text-slate-500" /> : <ChevronDown size={16} className="text-slate-500" />}
       </button>
 
       {/* Body */}
@@ -117,10 +227,10 @@ export default function VideoReviewCard({ video, globalIndex }) {
           {/* Combined issues */}
           {video.status === 'completed' && (
             <div>
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                    Combined Issues
+                    Issues
                   </h4>
                   {hasIssues && (
                     <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/30">
@@ -137,11 +247,7 @@ export default function VideoReviewCard({ video, globalIndex }) {
               </div>
 
               {hasIssues ? (
-                <div className="space-y-2">
-                  {[...(video.combined_issues)].sort((a, b) => tsToSec(a.timestamp) - tsToSec(b.timestamp)).map((issue, i) => (
-                    <IssueCard key={i} issue={issue} index={i} />
-                  ))}
-                </div>
+                <IssueBuckets issues={video.combined_issues} />
               ) : (
                 <div className="text-center py-6">
                   <div className="text-3xl mb-2">✅</div>
