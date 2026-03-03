@@ -8,6 +8,9 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
+const utc = (s) => new Date(s?.endsWith('Z') ? s : (s ?? '') + 'Z')
+const IST_DATE = { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }
+
 function StatTile({ icon: Icon, label, value, color, bg, note }) {
   return (
     <div className="glass p-5">
@@ -295,7 +298,7 @@ export default function AdminPanel() {
                       {u.role}
                     </span>
                     <span className="text-xs text-slate-600">
-                      {u.created_at ? new Date(u.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                      {u.created_at ? utc(u.created_at).toLocaleString('en-IN', IST_DATE) : '—'}
                     </span>
                   </div>
                 ))}

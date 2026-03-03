@@ -10,6 +10,14 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
+// Backend stores UTC but returns naive ISO strings without 'Z'.
+// Appending 'Z' forces the browser to interpret them as UTC,
+// so toLocaleString with timeZone:'Asia/Kolkata' shows correct IST.
+const utc = (s) => new Date(s?.endsWith('Z') ? s : (s ?? '') + 'Z')
+
+const IST_DATE = { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }
+const IST_DATETIME = { ...IST_DATE, hour: '2-digit', minute: '2-digit', hour12: true }
+
 function StatCard({ icon: Icon, label, value, color, bg }) {
   return (
     <div className="glass p-5 flex items-center gap-4">
@@ -64,7 +72,7 @@ function JobRow({ job, onClick, username }) {
           )}
           <span>{job.total_videos} video{job.total_videos !== 1 ? 's' : ''}</span>
           <span>•</span>
-          <span>{new Date(job.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })} IST</span>
+          <span>{utc(job.created_at).toLocaleString('en-IN', IST_DATETIME)} IST</span>
           {job.status === 'completed' && (
             <>
               <span>•</span>

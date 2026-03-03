@@ -6,6 +6,8 @@ import VideoReviewCard from '../components/VideoReviewCard'
 import { ArrowLeft, RefreshCw, BarChart3, Film, BookOpen, ChevronDown, ChevronUp, Loader } from 'lucide-react'
 import toast from 'react-hot-toast'
 
+const utc = (s) => new Date(s?.endsWith('Z') ? s : (s ?? '') + 'Z')
+
 function ReferenceAnalysisCard({ job }) {
   const [expanded, setExpanded] = useState(false)
 
@@ -287,7 +289,7 @@ export default function JobDetail() {
             </h1>
           </div>
           <p className="text-xs text-slate-500">
-            Submitted {new Date(job.created_at).toLocaleString('en-IN', {
+            Submitted {utc(job.created_at).toLocaleString('en-IN', {
               timeZone: 'Asia/Kolkata',
               day: '2-digit', month: 'short', year: 'numeric',
               hour: '2-digit', minute: '2-digit', hour12: true,
