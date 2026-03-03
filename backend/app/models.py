@@ -31,7 +31,7 @@ class ReviewJobCreate(BaseModel):
     job_name: Optional[str] = Field(None, max_length=100)
     grade: Optional[str] = Field(None, max_length=50)   # e.g. "Grade 3", "Grade 5"
     include_suggestions: bool = True
-    reference_drive_link: Optional[str] = Field(None, max_length=500)  # e.g. IXL video link
+    reference_drive_link: Optional[str] = Field(None, max_length=2000)  # e.g. IXL/Kaltura video link
 
 
 class PassResult(BaseModel):
