@@ -92,17 +92,36 @@ def download_from_drive(url: str) -> str:
     return dest
 
 
+def _resolve_hls_url(url: str) -> str:
+    """
+    If the URL is a Kaltura (or similar) HLS segment (.ts), convert it to the
+    manifest (.m3u8) so ffmpeg can download the full video instead of one chunk.
+
+    Example input:  .../name/a.mp4/seg-42-v1-a1.ts?Policy=...
+    Example output: .../name/a.mp4/index.m3u8?Policy=...
+    """
+    ts_pattern = re.compile(r"/seg-\d+[^?]*\.ts", re.IGNORECASE)
+    if ts_pattern.search(url):
+        url = ts_pattern.sub("/index.m3u8", url)
+        print(f"Resolved .ts segment URL → .m3u8 manifest: {url[:100]}…")
+    return url
+
+
 def download_video(url: str) -> str:
     """
     Universal video downloader.
-    - Google Drive URLs  → download_from_drive()
-    - HLS streams (.m3u8) → ffmpeg (remux segments into MP4)
-    - Direct video URLs  → streaming HTTP download
+    - Google Drive URLs       → download_from_drive()
+    - HLS streams (.m3u8)     → ffmpeg (remux segments into MP4)
+    - Kaltura .ts segments    → converted to .m3u8 first, then ffmpeg
+    - Direct video URLs       → streaming HTTP download
     Returns the local file path.
     """
     # Google Drive
     if extract_file_id(url):
         return download_from_drive(url)
+
+    # Resolve a bare .ts segment URL to its .m3u8 manifest
+    url = _resolve_hls_url(url)
 
     os.makedirs("/tmp/video_reviews", exist_ok=True)
     dest = f"/tmp/video_reviews/{uuid.uuid4()}.mp4"
