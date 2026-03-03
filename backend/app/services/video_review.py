@@ -203,6 +203,8 @@ REVIEW DIMENSIONS — apply all of these to every video regardless of topic:
 
 def extract_json(text: str) -> List[Dict]:
     """Extract a JSON array from Gemini's response (handles markdown code fences)."""
+    if not text:
+        return []
     fence = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text)
     if fence:
         try:
@@ -474,7 +476,11 @@ async def _run_pass(
             config=config,
         ),
     )
-    issues = extract_json(response.text)
+    try:
+        raw = response.text
+    except Exception:
+        raw = None
+    issues = extract_json(raw)
     return {
         "pass_number": pass_number,
         "rigor_level": rigor,
