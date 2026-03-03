@@ -1,6 +1,7 @@
 import re
 import os
 import uuid
+import subprocess
 import requests
 from typing import Optional
 
@@ -86,6 +87,56 @@ def download_from_drive(url: str) -> str:
             if chunk:
                 f.write(chunk)
 
+    size_mb = os.path.getsize(dest) / (1024 * 1024)
+    print(f"Downloaded {size_mb:.1f} MB → {dest}")
+    return dest
+
+
+def download_video(url: str) -> str:
+    """
+    Universal video downloader.
+    - Google Drive URLs  → download_from_drive()
+    - HLS streams (.m3u8) → ffmpeg (remux segments into MP4)
+    - Direct video URLs  → streaming HTTP download
+    Returns the local file path.
+    """
+    # Google Drive
+    if extract_file_id(url):
+        return download_from_drive(url)
+
+    os.makedirs("/tmp/video_reviews", exist_ok=True)
+    dest = f"/tmp/video_reviews/{uuid.uuid4()}.mp4"
+
+    # HLS stream
+    if ".m3u8" in url.lower():
+        print(f"Downloading HLS stream via ffmpeg: {url[:80]}…")
+        result = subprocess.run(
+            [
+                "ffmpeg", "-y",
+                "-i", url,
+                "-c", "copy",          # remux without re-encoding (fast)
+                "-movflags", "+faststart",
+                dest,
+            ],
+            capture_output=True,
+            timeout=300,               # 5-minute limit
+        )
+        if result.returncode != 0:
+            err = result.stderr.decode("utf-8", errors="replace")[-500:]
+            raise RuntimeError(f"ffmpeg failed downloading HLS stream: {err}")
+        size_mb = os.path.getsize(dest) / (1024 * 1024)
+        print(f"HLS download complete: {size_mb:.1f} MB → {dest}")
+        return dest
+
+    # Direct HTTP download (mp4, webm, etc.)
+    print(f"Direct HTTP download: {url[:80]}…")
+    response = requests.get(url, stream=True, timeout=120)
+    if response.status_code != 200:
+        raise ValueError(f"Failed to download reference video: HTTP {response.status_code}")
+    with open(dest, "wb") as f:
+        for chunk in response.iter_content(chunk_size=32768):
+            if chunk:
+                f.write(chunk)
     size_mb = os.path.getsize(dest) / (1024 * 1024)
     print(f"Downloaded {size_mb:.1f} MB → {dest}")
     return dest

@@ -24,7 +24,7 @@ from google import genai
 from google.genai import types
 
 from app.database import get_db
-from app.services.drive import download_from_drive
+from app.services.drive import download_from_drive, download_video
 
 
 MODEL_NAME = "gemini-2.5-flash"
@@ -505,7 +505,7 @@ async def _analyze_reference_video(
 
     try:
         print(f"[Job {job_id}] Reference video: downloading...")
-        video_path = await loop.run_in_executor(None, lambda: download_from_drive(drive_link))
+        video_path = await loop.run_in_executor(None, lambda: download_video(drive_link))
 
         print(f"[Job {job_id}] Reference video: uploading to Gemini...")
         video_file = await loop.run_in_executor(
