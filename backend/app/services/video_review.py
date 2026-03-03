@@ -504,8 +504,28 @@ def _ts_to_seconds(ts: str) -> int:
     return 9999
 
 
+def _canonicalize_timestamp(ts: str) -> str:
+    """
+    Normalise any model-produced timestamp to clean M:SS format.
+    "00:14-00:24" → "0:14"
+    "01:13:226"   → "1:13"
+    "02:11"       → "2:11"
+    Returns the original string unchanged if it cannot be parsed.
+    """
+    secs = _ts_to_seconds(ts)
+    if secs == 9999:
+        return ts  # unparseable — leave as-is rather than lose data
+    m, s = divmod(secs, 60)
+    return f"{m}:{s:02d}"
+
+
 def _combine_issues(passes: List[Dict]) -> List[Dict]:
-    """Merge issues from all passes, deduplicating by description similarity."""
+    """
+    Merge issues from all passes:
+    - Deduplicate by description similarity (first 80 chars, case-insensitive)
+    - Normalise every timestamp to M:SS
+    - Sort chronologically
+    """
     combined = []
     seen = set()
 
@@ -514,6 +534,9 @@ def _combine_issues(passes: List[Dict]) -> List[Dict]:
             desc = issue.get("description", "").lower().strip()
             key = desc[:80]
             if key and key not in seen:
+                # Normalise the timestamp in-place on a copy so the original pass data is untouched
+                issue = dict(issue)
+                issue["timestamp"] = _canonicalize_timestamp(issue.get("timestamp", "") or "")
                 combined.append(issue)
                 seen.add(key)
 
