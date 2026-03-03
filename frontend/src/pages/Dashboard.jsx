@@ -24,7 +24,7 @@ function StatCard({ icon: Icon, label, value, color, bg }) {
   )
 }
 
-function JobRow({ job, onClick }) {
+function JobRow({ job, onClick, username }) {
   const isActive = job.status === 'processing' || job.status === 'pending'
   return (
     <button
@@ -56,6 +56,12 @@ function JobRow({ job, onClick }) {
           <StatusBadge status={job.status} size="sm" />
         </div>
         <div className="flex items-center gap-3 text-xs text-slate-500">
+          {username && (
+            <>
+              <span className="text-cyan-400 font-semibold">{username}</span>
+              <span>•</span>
+            </>
+          )}
           <span>{job.total_videos} video{job.total_videos !== 1 ? 's' : ''}</span>
           <span>•</span>
           <span>{new Date(job.created_at).toLocaleDateString()} {new Date(job.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
@@ -93,39 +99,59 @@ function JobRow({ job, onClick }) {
 export default function Dashboard() {
   const { user }  = useAuth()
   const navigate  = useNavigate()
+  const isAdmin   = user?.role === 'admin'
 
-  const [jobs, setJobs]         = useState([])
-  const [loading, setLoading]   = useState(true)
+  const [myJobs,  setMyJobs]  = useState([])
+  const [allJobs, setAllJobs] = useState([])
+  const [users,   setUsers]   = useState([])
+  const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [links, setLinks]       = useState([''])
   const [grade, setGrade]       = useState('')
   const [includeSuggestions, setIncludeSuggestions] = useState(true)
   const [referenceLink, setReferenceLink] = useState('')
   const [showReference, setShowReference] = useState(false)
-  const intervalRef             = useRef(null)
+  const [viewTab, setViewTab]   = useState('mine')   // admin only: 'mine' | 'all'
+  const [filterUserId, setFilterUserId] = useState('')
+  const intervalRef = useRef(null)
 
-  const fetchJobs = useCallback(async () => {
+  const fetchMyJobs = useCallback(async () => {
     try {
-      const res = user?.role === 'admin' ? await adminAPI.getAllJobs() : await reviewsAPI.list()
-      setJobs(res.data)
+      const res = await reviewsAPI.list()
+      setMyJobs(res.data)
     } catch (_) {}
-    finally { setLoading(false) }
-  }, [user?.role])
+  }, [])
 
-  // Poll when any job is active
-  useEffect(() => {
-    fetchJobs()
-  }, [fetchJobs])
+  const fetchAllData = useCallback(async () => {
+    if (!isAdmin) return
+    try {
+      const [jobsRes, usersRes] = await Promise.all([adminAPI.getAllJobs(), adminAPI.getUsers()])
+      setAllJobs(jobsRes.data)
+      setUsers(usersRes.data)
+    } catch (_) {}
+  }, [isAdmin])
 
+  const fetchAll = useCallback(async () => {
+    setLoading(true)
+    await Promise.all([fetchMyJobs(), fetchAllData()])
+    setLoading(false)
+  }, [fetchMyJobs, fetchAllData])
+
+  useEffect(() => { fetchAll() }, [fetchAll])
+
+  // Poll while any of my jobs is active
   useEffect(() => {
-    const hasActive = jobs.some(j => j.status === 'processing' || j.status === 'pending')
+    const hasActive = myJobs.some(j => j.status === 'processing' || j.status === 'pending')
     if (hasActive) {
-      intervalRef.current = setInterval(fetchJobs, 4000)
+      intervalRef.current = setInterval(() => {
+        fetchMyJobs()
+        if (isAdmin) fetchAllData()
+      }, 4000)
     } else {
       clearInterval(intervalRef.current)
     }
     return () => clearInterval(intervalRef.current)
-  }, [jobs, fetchJobs])
+  }, [myJobs, fetchMyJobs, fetchAllData, isAdmin])
 
   const addLink  = () => setLinks([...links, ''])
   const rmLink   = (i) => setLinks(links.filter((_, idx) => idx !== i))
@@ -156,7 +182,7 @@ export default function Dashboard() {
       const res = await reviewsAPI.create(payload)
       toast.success(`Review job started for ${clean.length} video${clean.length !== 1 ? 's' : ''}!`)
       setLinks([''])
-      await fetchJobs()
+      await fetchAll()
       navigate(`/jobs/${res.data.job_id}`)
     } catch (err) {
       toast.error(err.response?.data?.detail ?? 'Failed to start review')
@@ -165,11 +191,17 @@ export default function Dashboard() {
     }
   }
 
-  // Stats
-  const total      = jobs.length
-  const active     = jobs.filter(j => j.status === 'processing' || j.status === 'pending').length
-  const completed  = jobs.filter(j => j.status === 'completed').length
-  const allIssues  = jobs.reduce((s, j) => s + (j.total_issues ?? 0), 0)
+  // Stats always reflect the admin's own jobs
+  const statsJobs  = myJobs
+  const total      = statsJobs.length
+  const active     = statsJobs.filter(j => j.status === 'processing' || j.status === 'pending').length
+  const completed  = statsJobs.filter(j => j.status === 'completed').length
+  const allIssues  = statsJobs.reduce((s, j) => s + (j.total_issues ?? 0), 0)
+
+  // For the "All" tab
+  const userMap      = Object.fromEntries(users.map(u => [u.id, u.username]))
+  const filteredJobs = filterUserId ? allJobs.filter(j => j.user_id === filterUserId) : allJobs
+  const activeAll    = allJobs.filter(j => j.status === 'processing' || j.status === 'pending').length
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
@@ -181,12 +213,12 @@ export default function Dashboard() {
         <p className="text-slate-500">Submit Google Drive video links for AI-powered QA review.</p>
       </div>
 
-      {/* Stats */}
+      {/* Stats (always personal) */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 animate-slide-up" style={{ animationDelay: '60ms' }}>
-        <StatCard icon={Film}         label="Total Jobs"   value={total}     color="text-purple-400" bg="bg-purple-500/15" />
-        <StatCard icon={Loader}       label="Processing"   value={active}    color="text-amber-400"  bg="bg-amber-500/15" />
-        <StatCard icon={CheckCircle}  label="Completed"    value={completed} color="text-emerald-400" bg="bg-emerald-500/15" />
-        <StatCard icon={AlertTriangle} label="Issues Found" value={allIssues} color="text-red-400"   bg="bg-red-500/15" />
+        <StatCard icon={Film}         label="My Total Jobs"  value={total}     color="text-purple-400" bg="bg-purple-500/15" />
+        <StatCard icon={Loader}       label="Processing"     value={active}    color="text-amber-400"  bg="bg-amber-500/15" />
+        <StatCard icon={CheckCircle}  label="Completed"      value={completed} color="text-emerald-400" bg="bg-emerald-500/15" />
+        <StatCard icon={AlertTriangle} label="Issues Found"  value={allIssues} color="text-red-400"    bg="bg-red-500/15" />
       </div>
 
       {/* Submit form */}
@@ -223,7 +255,6 @@ export default function Dashboard() {
 
           {/* Grade + suggestions row */}
           <div className="flex flex-wrap items-center gap-3 pt-1">
-            {/* Grade selector */}
             <div className="flex items-center gap-2">
               <GraduationCap size={14} className="text-slate-500 shrink-0" />
               <select
@@ -240,7 +271,6 @@ export default function Dashboard() {
               </select>
             </div>
 
-            {/* Suggestions toggle */}
             <label className="flex items-center gap-2 cursor-pointer select-none">
               <div
                 onClick={() => setIncludeSuggestions(v => !v)}
@@ -326,31 +356,106 @@ export default function Dashboard() {
 
       {/* Jobs list */}
       <div className="animate-slide-up" style={{ animationDelay: '180ms' }}>
-        <h2 className="text-base font-bold text-white mb-3">
-          {user?.role === 'admin' ? 'All Reviews (Platform-wide)' : 'Your Review History'}
-          {active > 0 && (
-            <span className="ml-2 text-xs font-semibold text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded-full">
-              {active} active
-            </span>
-          )}
-        </h2>
 
-        {loading ? (
-          <div className="space-y-2">
-            {[1,2,3].map(i => <div key={i} className="skeleton h-16 rounded-xl" />)}
+        {/* Admin: tab switcher */}
+        {isAdmin && (
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex gap-1 p-1 glass rounded-xl w-fit">
+              <button
+                onClick={() => setViewTab('mine')}
+                className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${
+                  viewTab === 'mine' ? 'bg-brand-purple text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Mine ({myJobs.length})
+              </button>
+              <button
+                onClick={() => setViewTab('all')}
+                className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${
+                  viewTab === 'all' ? 'bg-brand-purple text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                All ({filteredJobs.length}{filterUserId ? `/${allJobs.length}` : ''})
+                {activeAll > 0 && (
+                  <span className="ml-1.5 text-xs font-semibold text-amber-400 bg-amber-500/15 px-1.5 py-0.5 rounded-full">
+                    {activeAll}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {/* User filter — only visible on "All" tab */}
+            {viewTab === 'all' && (
+              <select
+                value={filterUserId}
+                onChange={e => setFilterUserId(e.target.value)}
+                className="text-xs bg-slate-800 border border-white/10 text-slate-300 rounded-lg px-3 py-1.5 focus:outline-none focus:border-violet-500"
+              >
+                <option value="">All Users</option>
+                {users.filter(u => u.role !== 'admin').map(u => (
+                  <option key={u.id} value={u.id}>{u.username}</option>
+                ))}
+              </select>
+            )}
           </div>
-        ) : jobs.length === 0 ? (
-          <div className="glass text-center py-16">
-            <div className="text-5xl mb-3">🎬</div>
-            <p className="text-slate-400 font-medium">No reviews yet</p>
-            <p className="text-slate-600 text-sm mt-1">Submit your first Drive link above to get started</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {jobs.map(job => (
-              <JobRow key={job.id} job={job} onClick={() => navigate(`/jobs/${job.id}`)} />
-            ))}
-          </div>
+        )}
+
+        {/* Section label for non-admin */}
+        {!isAdmin && (
+          <h2 className="text-base font-bold text-white mb-3">
+            Your Review History
+            {active > 0 && (
+              <span className="ml-2 text-xs font-semibold text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded-full">
+                {active} active
+              </span>
+            )}
+          </h2>
+        )}
+
+        {/* "Mine" tab / regular user list */}
+        {(!isAdmin || viewTab === 'mine') && (
+          loading ? (
+            <div className="space-y-2">
+              {[1,2,3].map(i => <div key={i} className="skeleton h-16 rounded-xl" />)}
+            </div>
+          ) : myJobs.length === 0 ? (
+            <div className="glass text-center py-16">
+              <div className="text-5xl mb-3">🎬</div>
+              <p className="text-slate-400 font-medium">No reviews yet</p>
+              <p className="text-slate-600 text-sm mt-1">Submit your first Drive link above to get started</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {myJobs.map(job => (
+                <JobRow key={job.id} job={job} onClick={() => navigate(`/jobs/${job.id}`)} />
+              ))}
+            </div>
+          )
+        )}
+
+        {/* "All" tab — admin only */}
+        {isAdmin && viewTab === 'all' && (
+          loading ? (
+            <div className="space-y-2">
+              {[1,2,3].map(i => <div key={i} className="skeleton h-16 rounded-xl" />)}
+            </div>
+          ) : filteredJobs.length === 0 ? (
+            <div className="glass text-center py-16">
+              <div className="text-5xl mb-3">🎬</div>
+              <p className="text-slate-400 font-medium">{filterUserId ? 'No jobs for this user' : 'No jobs yet'}</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {filteredJobs.map(job => (
+                <JobRow
+                  key={job.id}
+                  job={job}
+                  onClick={() => navigate(`/jobs/${job.id}`)}
+                  username={userMap[job.user_id]}
+                />
+              ))}
+            </div>
+          )
         )}
       </div>
     </div>

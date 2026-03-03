@@ -203,12 +203,12 @@ export default function AdminPanel() {
         {/* Jobs table */}
         {tab === 'jobs' && (
           <div className="glass rounded-2xl overflow-hidden">
-            <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500 border-b border-white/5">
+            <div className="grid grid-cols-[1fr_150px_72px_72px_110px] px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500 border-b border-white/5">
               <span>Job Name / ID</span>
               <span>User</span>
-              <span>Videos</span>
-              <span>Issues</span>
-              <span>Status</span>
+              <span className="text-center">Videos</span>
+              <span className="text-center">Issues</span>
+              <span className="text-center">Status</span>
             </div>
             {loading ? (
               <div className="p-4 space-y-2">
@@ -222,27 +222,29 @@ export default function AdminPanel() {
                   <button
                     key={job.id}
                     onClick={() => navigate(`/jobs/${job.id}`)}
-                    className="w-full grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 px-5 py-3.5 text-left hover:bg-white/[0.025] transition-colors items-center"
+                    className="w-full grid grid-cols-[1fr_150px_72px_72px_110px] px-5 py-3.5 text-left hover:bg-white/[0.025] transition-colors items-center"
                   >
-                    <div className="min-w-0">
+                    <div className="min-w-0 pr-4">
                       <span className="text-sm text-slate-200 truncate block">
                         {job.job_name || `Job #${job.id?.slice(-8)}`}
                       </span>
                       <span className="font-mono text-xs text-slate-600">#{job.id?.slice(-10)}</span>
                     </div>
                     <span
-                      className="text-xs font-semibold text-cyan-400 text-right cursor-pointer hover:underline"
+                      className="text-sm font-semibold text-cyan-400 truncate cursor-pointer hover:underline"
                       onClick={e => { e.stopPropagation(); setFilterUserId(job.user_id === filterUserId ? '' : job.user_id) }}
                     >
                       {userMap[job.user_id] || job.user_id?.slice(-8)}
                     </span>
-                    <span className="text-sm font-semibold text-white text-right">{job.total_videos}</span>
-                    <span className={`text-sm font-semibold text-right ${
+                    <span className="text-sm font-bold text-white text-center">{job.total_videos}</span>
+                    <span className={`text-sm font-bold text-center ${
                       (job.total_issues ?? 0) > 0 ? 'text-red-400' : 'text-emerald-400'
                     }`}>
                       {job.total_issues ?? 0}
                     </span>
-                    <StatusBadge status={job.status} size="sm" />
+                    <div className="flex justify-center">
+                      <StatusBadge status={job.status} size="sm" />
+                    </div>
                   </button>
                 ))}
               </div>
