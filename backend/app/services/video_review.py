@@ -196,6 +196,29 @@ REVIEW DIMENSIONS — apply all of these to every video regardless of topic:
       before the next arrives; flag sections that are rushed.
     - Transitional summaries or recaps after multi-step sequences are expected;
       flag their absence when the preceding content was complex.
+
+13. ANIMATION MATHEMATICAL ACCURACY
+    Verify that every animation directly and correctly encodes the mathematics
+    it is meant to illustrate — not just the outcome, but the internal
+    structure of the operation:
+    - STEP COUNT: The number of distinct visual steps in an animation must
+      equal the mathematical quantity it represents. For example, when showing
+      decimal point movement for ×10^n, the animation must show exactly n
+      individual hops (one per place-value shift) — not a single large arc
+      that spans all n digits at once. A single sweeping motion collapses n
+      steps into 1 and destroys the one-to-one mapping the animation is
+      meant to teach.
+    - MAGNITUDE vs. COUNT: Flag any animation where size, arc length, or
+      visual weight increases with the exponent/multiplier instead of the
+      COUNT of distinct visual events increasing. Larger hops are not the
+      same as more hops.
+    - CORRESPONDENCE: Every animated element (arrow, bracket, jump, tick)
+      must map to exactly one unit of the mathematical quantity being shown.
+      If the animation uses 2 arrows for a ×100 step, that is a visual lie
+      even if the final answer is correct.
+    - ZERO-FILL ANIMATION: When zeros must be appended to complete a decimal
+      shift, each zero must be added individually and visibly — not appear
+      all at once — so the student can count them against the exponent.
 """
 
 
