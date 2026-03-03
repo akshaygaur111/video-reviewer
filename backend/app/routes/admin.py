@@ -1,13 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from bson import ObjectId
 from datetime import datetime
 import os
+from typing import Optional
 
 from google import genai
 
 from app.auth import get_admin_user, hash_password
 from app.database import get_db
 from app.models import UserRegister
+from app.services.video_review import _combine_issues
 
 router = APIRouter()
 
@@ -20,10 +22,68 @@ def _serialize_job(job: dict) -> dict:
 
 
 @router.get("/jobs")
-async def get_all_jobs(admin_user: dict = Depends(get_admin_user)):
+async def get_all_jobs(
+    user_id: Optional[str] = Query(None, description="Filter by user_id"),
+    admin_user: dict = Depends(get_admin_user),
+):
     db = get_db()
-    cursor = db.jobs.find({}, sort=[("created_at", -1)])
+    query = {}
+    if user_id:
+        try:
+            query["user_id"] = ObjectId(user_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid user_id")
+    cursor = db.jobs.find(query, sort=[("created_at", -1)])
     return [_serialize_job(j) async for j in cursor]
+
+
+@router.post("/jobs/{job_id}/recover")
+async def recover_job(job_id: str, admin_user: dict = Depends(get_admin_user)):
+    """
+    Re-run _combine_issues on whatever passes already completed for a failed job
+    and mark the job (and its videos) as completed so the feedback is visible.
+    """
+    db = get_db()
+    try:
+        job = await db.jobs.find_one({"_id": ObjectId(job_id)})
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid job_id")
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    total_combined = 0
+    for i, video in enumerate(job.get("videos", [])):
+        passes = video.get("passes", [])
+        if not passes:
+            continue
+        combined = _combine_issues(passes)
+        total_combined += len(combined)
+        await db.jobs.update_one(
+            {"_id": ObjectId(job_id)},
+            {
+                "$set": {
+                    f"videos.{i}.combined_issues": combined,
+                    f"videos.{i}.total_issues": len(combined),
+                    f"videos.{i}.status": "completed",
+                    f"videos.{i}.error": None,
+                    f"videos.{i}.completed_at": video.get("completed_at") or datetime.utcnow(),
+                }
+            },
+        )
+
+    await db.jobs.update_one(
+        {"_id": ObjectId(job_id)},
+        {
+            "$set": {
+                "status": "completed",
+                "total_issues": total_combined,
+                "completed_at": job.get("completed_at") or datetime.utcnow(),
+            }
+        },
+    )
+
+    job = await db.jobs.find_one({"_id": ObjectId(job_id)})
+    return _serialize_job(job)
 
 
 @router.get("/users")
