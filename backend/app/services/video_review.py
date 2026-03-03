@@ -287,6 +287,34 @@ ADDITIVE to the normal review.
 """
 
 
+def _normalize_transcript(transcript: str) -> str:
+    """
+    Convert raw transcript timestamps from the verbose Gemini format
+    ( e.g.  [ 0m1s497ms - 0m7s27ms ] )
+    to a compact, model-friendly format
+    ( e.g.  [0:01 - 0:07] )
+    so the model can easily match issues to the correct second.
+    """
+    def _parse_ts(raw: str) -> str:
+        """XmYsZms → M:SS"""
+        m = re.match(r"(\d+)m(\d+)s", raw.strip())
+        if m:
+            mins, secs = int(m.group(1)), int(m.group(2))
+            return f"{mins}:{secs:02d}"
+        return raw.strip()
+
+    def _replace(match):
+        start = _parse_ts(match.group(1))
+        end   = _parse_ts(match.group(2))
+        return f"[{start} - {end}]"
+
+    return re.sub(
+        r"\[\s*(\d+m\d+s\d*m?s?)\s*-\s*(\d+m\d+s\d*m?s?)\s*\]",
+        _replace,
+        transcript,
+    )
+
+
 def _format_prior_issues(previous_passes: List[Dict]) -> str:
     """Flatten issues from all previous passes into a readable summary."""
     items = []
@@ -321,6 +349,7 @@ Calibrate your assessment accordingly:
 
     output_keys = "timestamp, category, description, suggestion" if include_suggestions else "timestamp, category, description"
     suggestion_note = "" if include_suggestions else "\n  Do NOT include a 'suggestion' key — omit it entirely."
+    transcript = _normalize_transcript(transcript)
 
     prior_block = ""
     if previous_passes:
@@ -371,6 +400,16 @@ TRANSCRIPT (ground truth for audio):
 OUTPUT: First briefly note (one line per dimension) whether each of the 12 dimensions is clean or has issues.
 Then output ONLY a JSON array of issue objects. Each element must have keys:
   {output_keys}{suggestion_note}
+
+TIMESTAMP RULES — zero tolerance for approximation:
+  - Every "timestamp" value MUST be the START time of the transcript line
+    where the issue first occurs, copied verbatim from the transcript above.
+  - Format: M:SS  (e.g. "1:08", "2:42"). Never guess or round.
+  - If an issue spans multiple transcript lines, use the start time of the
+    FIRST affected line.
+  - Do NOT invent a timestamp that does not appear as a start time in the
+    transcript.
+
 If there are no issues return an empty array [].
 """
     if rigor == "standard":
