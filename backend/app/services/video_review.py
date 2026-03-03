@@ -405,10 +405,16 @@ TIMESTAMP RULES — zero tolerance for approximation:
   - Every "timestamp" value MUST be the START time of the transcript line
     where the issue first occurs, copied verbatim from the transcript above.
   - Format: M:SS  (e.g. "1:08", "2:42"). Never guess or round.
+  - Do NOT use range format (e.g. "1:08-1:24") — use only the single start time.
   - If an issue spans multiple transcript lines, use the start time of the
     FIRST affected line.
   - Do NOT invent a timestamp that does not appear as a start time in the
     transcript.
+
+ONE ISSUE PER DEFECT — if a single on-screen problem (e.g. wrong label text)
+  touches multiple review dimensions (e.g. Factual Accuracy AND Formatting),
+  file it as ONE issue under the MOST SPECIFIC applicable category. Do NOT
+  duplicate the same defect under multiple categories.
 
 If there are no issues return an empty array [].
 """
@@ -475,6 +481,29 @@ def _determine_rigor(pass_number: int, previous_passes: List[Dict]) -> str:
     return {1: "standard", 2: "enhanced", 3: "maximum"}[pass_number]
 
 
+def _ts_to_seconds(ts: str) -> int:
+    """
+    Convert any timestamp variant the model may produce to integer seconds.
+    Handles:
+      "M:SS"          →  standard (e.g. "1:08")
+      "MM:SS"         →  standard with leading zero (e.g. "01:08")
+      "MM:SS:mmm"     →  pass-2 millisecond bleed (e.g. "01:13:226") — ignore ms
+      "MM:SS-MM:SS"   →  range — use start time only (e.g. "00:14-00:24")
+    """
+    ts = ts.strip()
+    # Strip range suffix  "0:14-0:24"  →  "0:14"
+    ts = re.split(r"\s*-\s*(?=\d)", ts)[0].strip()
+    # Split on any non-digit separator
+    parts = re.split(r"[^0-9]+", ts)
+    parts = [p for p in parts if p]
+    try:
+        if len(parts) >= 2:
+            return int(parts[0]) * 60 + int(parts[1])
+    except Exception:
+        pass
+    return 9999
+
+
 def _combine_issues(passes: List[Dict]) -> List[Dict]:
     """Merge issues from all passes, deduplicating by description similarity."""
     combined = []
@@ -483,22 +512,12 @@ def _combine_issues(passes: List[Dict]) -> List[Dict]:
     for p in passes:
         for issue in p.get("issues", []):
             desc = issue.get("description", "").lower().strip()
-            key = desc[:60]
+            key = desc[:80]
             if key and key not in seen:
                 combined.append(issue)
                 seen.add(key)
 
-    def _ts_key(item):
-        ts = item.get("timestamp", "") or ""
-        parts = re.split(r"[:.]", ts)
-        try:
-            if len(parts) >= 2:
-                return int(parts[0]) * 60 + int(parts[1])
-        except Exception:
-            pass
-        return 9999
-
-    return sorted(combined, key=_ts_key)
+    return sorted(combined, key=lambda item: _ts_to_seconds(item.get("timestamp", "") or ""))
 
 
 # ── Core review logic ─────────────────────────────────────────────────────────
