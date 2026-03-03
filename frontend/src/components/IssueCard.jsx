@@ -8,6 +8,12 @@ const CATEGORY_STYLE = {
   'Logic':         { icon: AlertTriangle,bg: 'bg-purple-500/10', border: 'border-purple-500/25', text: 'text-purple-400', label: 'text-purple-300', badge: 'bg-purple-500/15 border-purple-500/30' },
 }
 
+const SEVERITY_STYLE = {
+  'Critical': { dot: 'bg-red-400',    text: 'text-red-400',    badge: 'bg-red-500/15 border-red-500/30 text-red-300' },
+  'Major':    { dot: 'bg-amber-400',  text: 'text-amber-400',  badge: 'bg-amber-500/15 border-amber-500/30 text-amber-300' },
+  'Minor':    { dot: 'bg-blue-400',   text: 'text-blue-400',   badge: 'bg-blue-500/15 border-blue-500/30 text-blue-300' },
+}
+
 function getStyle(category = '') {
   for (const [key, val] of Object.entries(CATEGORY_STYLE)) {
     if (category.toLowerCase().includes(key.toLowerCase())) return val
@@ -18,6 +24,10 @@ function getStyle(category = '') {
     text: 'text-slate-400', label: 'text-slate-300',
     badge: 'bg-slate-700/40 border-slate-600/30',
   }
+}
+
+function getSeverityStyle(severity = '') {
+  return SEVERITY_STYLE[severity] ?? { dot: 'bg-slate-500', text: 'text-slate-400', badge: 'bg-slate-700/40 border-slate-600/30 text-slate-400' }
 }
 
 /**
@@ -55,9 +65,10 @@ function formatTimestamp(ts) {
 
 export default function IssueCard({ issue, index }) {
   const [open, setOpen] = useState(false)
-  const style = getStyle(issue.category)
-  const Icon  = style.icon
-  const ts    = formatTimestamp(issue.timestamp)
+  const style    = getStyle(issue.category)
+  const sevStyle = getSeverityStyle(issue.severity)
+  const Icon     = style.icon
+  const ts       = formatTimestamp(issue.timestamp)
 
   return (
     <div className={`rounded-xl border ${style.border} overflow-hidden transition-all`}
@@ -66,6 +77,9 @@ export default function IssueCard({ issue, index }) {
         onClick={() => setOpen(!open)}
         className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-white/[0.025] transition-colors"
       >
+        {/* Severity dot */}
+        <span className={`w-2 h-2 rounded-full shrink-0 mt-1.5 ${sevStyle.dot}`} title={issue.severity || 'Unknown severity'} />
+
         {/* Timestamp */}
         <span className={`text-xs font-mono font-bold mt-0.5 min-w-[3.2rem] ${style.text}`}>
           {ts}
@@ -91,6 +105,13 @@ export default function IssueCard({ issue, index }) {
       {open && (
         <div className={`px-4 pb-4 pt-2 space-y-3 border-t ${style.border} animate-fade-in`}
              style={{ background: 'rgba(255,255,255,0.02)' }}>
+          {/* Severity badge (expanded) */}
+          {issue.severity && (
+            <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${sevStyle.badge}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${sevStyle.dot}`} />
+              {issue.severity}
+            </span>
+          )}
           <p className="text-sm text-slate-200 leading-relaxed">{issue.description}</p>
           {issue.suggestion && (
             <div className="flex gap-2 p-2.5 rounded-lg bg-emerald-500/8 border border-emerald-500/20">

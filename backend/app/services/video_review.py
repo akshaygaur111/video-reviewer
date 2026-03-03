@@ -347,7 +347,7 @@ Calibrate your assessment accordingly:
 - Sequencing issues (e.g. skipped scaffolding, premature abstraction) should be judged relative to what {grade} students can reasonably be expected to know.
 """
 
-    output_keys = "timestamp, category, description, suggestion" if include_suggestions else "timestamp, category, description"
+    output_keys = "timestamp, category, severity, description, suggestion" if include_suggestions else "timestamp, category, severity, description"
     suggestion_note = "" if include_suggestions else "\n  Do NOT include a 'suggestion' key — omit it entirely."
     transcript = _normalize_transcript(transcript)
 
@@ -397,6 +397,16 @@ TRANSCRIPT (ground truth for audio):
 {grade_block}{reference_block}{prior_block}
 {REVIEW_DIMENSIONS}
 {checklist}
+SEVERITY CLASSIFICATION — assign exactly one severity value to every issue:
+  "Critical" — Factual or mathematical errors that will directly mislead students
+               (wrong answer, wrong formula, incorrect label, calculation mistake).
+  "Major"    — Significant pedagogical or synchronisation flaws that noticeably
+               impair learning (audio-visual mismatch, wrong instructional order,
+               missing scaffolding, cognitive overload, scope gaps).
+  "Minor"    — Cosmetic or consistency issues that do not fundamentally harm
+               understanding (capitalisation, punctuation, slight pacing variance,
+               mild over-highlighting, minor terminology inconsistency).
+
 OUTPUT: First briefly note (one line per dimension) whether each of the 12 dimensions is clean or has issues.
 Then output ONLY a JSON array of issue objects. Each element must have keys:
   {output_keys}{suggestion_note}

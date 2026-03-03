@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronDown, ChevronUp, Link2, AlertCircle, CheckCircle2, Calculator, Mic, BookOpen } from 'lucide-react'
+import { ChevronDown, ChevronUp, Link2, AlertCircle, CheckCircle2, Flame, AlertTriangle, Info } from 'lucide-react'
 import StatusBadge from './StatusBadge'
 import ProgressRigor from './ProgressRigor'
 import IssueCard from './IssueCard'
@@ -26,20 +26,57 @@ function shortLink(url) {
   }
 }
 
-// Category metadata for bucket tabs
-const CAT_META = {
-  'Math':         { icon: Calculator,   text: 'text-red-400',    bg: 'bg-red-500/12',    activeBg: 'bg-red-500/25',    border: 'border-red-500/30',    activeBorder: 'border-red-400/60' },
-  'Audio-Visual': { icon: Mic,          text: 'text-amber-400',  bg: 'bg-amber-500/12',  activeBg: 'bg-amber-500/25',  border: 'border-amber-500/30',  activeBorder: 'border-amber-400/60' },
-  'Grammar':      { icon: BookOpen,     text: 'text-blue-400',   bg: 'bg-blue-500/12',   activeBg: 'bg-blue-500/25',   border: 'border-blue-500/30',   activeBorder: 'border-blue-400/60' },
-  'Logic':        { icon: AlertCircle,  text: 'text-purple-400', bg: 'bg-purple-500/12', activeBg: 'bg-purple-500/25', border: 'border-purple-500/30', activeBorder: 'border-purple-400/60' },
-}
-const OTHER_META = { icon: AlertCircle, text: 'text-slate-400', bg: 'bg-slate-700/30', activeBg: 'bg-slate-600/40', border: 'border-slate-600/30', activeBorder: 'border-slate-500/60' }
+// Severity bucket metadata — ordered from most to least severe
+const SEVERITY_BUCKETS = [
+  {
+    key: 'Critical',
+    icon: Flame,
+    text: 'text-red-400',
+    bg: 'bg-red-500/12',
+    activeBg: 'bg-red-500/25',
+    border: 'border-red-500/30',
+    activeBorder: 'border-red-400/70',
+    bar: 'bg-red-500/60',
+    description: 'Factual / math errors',
+  },
+  {
+    key: 'Major',
+    icon: AlertTriangle,
+    text: 'text-amber-400',
+    bg: 'bg-amber-500/12',
+    activeBg: 'bg-amber-500/25',
+    border: 'border-amber-500/30',
+    activeBorder: 'border-amber-400/70',
+    bar: 'bg-amber-500/60',
+    description: 'Pedagogical / sync flaws',
+  },
+  {
+    key: 'Minor',
+    icon: Info,
+    text: 'text-blue-400',
+    bg: 'bg-blue-500/12',
+    activeBg: 'bg-blue-500/25',
+    border: 'border-blue-500/30',
+    activeBorder: 'border-blue-400/70',
+    bar: 'bg-blue-500/60',
+    description: 'Cosmetic / consistency',
+  },
+]
 
-function getCatKey(category = '') {
-  for (const key of Object.keys(CAT_META)) {
-    if (category.toLowerCase().includes(key.toLowerCase())) return key
-  }
-  return 'Other'
+const UNKNOWN_BUCKET = {
+  key: 'Other',
+  icon: AlertCircle,
+  text: 'text-slate-400',
+  bg: 'bg-slate-700/25',
+  activeBg: 'bg-slate-600/40',
+  border: 'border-slate-600/30',
+  activeBorder: 'border-slate-500/60',
+  bar: 'bg-slate-500/40',
+  description: 'Unclassified',
+}
+
+function getSeverityBucket(severity = '') {
+  return SEVERITY_BUCKETS.find(b => b.key === severity) ?? UNKNOWN_BUCKET
 }
 
 function IssueBuckets({ issues }) {
@@ -47,19 +84,26 @@ function IssueBuckets({ issues }) {
 
   const sorted = [...issues].sort((a, b) => tsToSec(a.timestamp) - tsToSec(b.timestamp))
 
-  // Build ordered category list (preserve insertion order, All first)
+  // Count per severity (only buckets that have issues)
   const counts = {}
   sorted.forEach(issue => {
-    const k = getCatKey(issue.category)
+    const k = getSeverityBucket(issue.severity).key
     counts[k] = (counts[k] || 0) + 1
   })
-  const cats = Object.keys(counts)
 
-  const displayed = active === 'All' ? sorted : sorted.filter(i => getCatKey(i.category) === active)
+  // Ordered list of buckets that actually have issues
+  const activeBuckets = [
+    ...SEVERITY_BUCKETS.filter(b => counts[b.key] > 0),
+    ...(counts['Other'] ? [UNKNOWN_BUCKET] : []),
+  ]
+
+  const displayed = active === 'All'
+    ? sorted
+    : sorted.filter(i => getSeverityBucket(i.severity).key === active)
 
   return (
     <div className="space-y-3">
-      {/* Category tab strip */}
+      {/* Severity tab strip */}
       <div className="flex flex-wrap gap-2">
         {/* All tab */}
         {(() => {
@@ -81,48 +125,44 @@ function IssueBuckets({ issues }) {
           )
         })()}
 
-        {/* Per-category tabs */}
-        {cats.map(cat => {
-          const meta = CAT_META[cat] ?? OTHER_META
-          const Icon = meta.icon
-          const isActive = active === cat
+        {/* Per-severity tabs (only shown when they have issues) */}
+        {activeBuckets.map(bucket => {
+          const Icon = bucket.icon
+          const isActive = active === bucket.key
           return (
             <button
-              key={cat}
-              onClick={() => setActive(cat)}
+              key={bucket.key}
+              onClick={() => setActive(bucket.key)}
+              title={bucket.description}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
                 isActive
-                  ? `${meta.activeBg} ${meta.activeBorder} ${meta.text}`
-                  : `${meta.bg} ${meta.border} ${meta.text} opacity-70 hover:opacity-100`
+                  ? `${bucket.activeBg} ${bucket.activeBorder} ${bucket.text}`
+                  : `${bucket.bg} ${bucket.border} ${bucket.text} opacity-70 hover:opacity-100`
               }`}
             >
               <Icon size={11} />
-              {cat}
+              {bucket.key}
               <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${isActive ? 'bg-white/15' : 'bg-white/8'}`}>
-                {counts[cat]}
+                {counts[bucket.key]}
               </span>
             </button>
           )
         })}
       </div>
 
-      {/* Mini category breakdown bar */}
-      {cats.length > 1 && (
+      {/* Proportional severity breakdown bar */}
+      {activeBuckets.length > 1 && (
         <div className="flex h-1 rounded-full overflow-hidden gap-px">
-          {cats.map(cat => {
-            const meta = CAT_META[cat] ?? OTHER_META
-            const pct = (counts[cat] / issues.length) * 100
-            // Extract color from text class for background
-            const barColor = meta.text.replace('text-', 'bg-').replace('/400', '/50')
-            return (
-              <div
-                key={cat}
-                className={`h-full transition-all ${barColor} ${active === cat ? 'opacity-100' : active === 'All' ? 'opacity-70' : 'opacity-25'}`}
-                style={{ width: `${pct}%` }}
-                title={`${cat}: ${counts[cat]}`}
-              />
-            )
-          })}
+          {activeBuckets.map(bucket => (
+            <div
+              key={bucket.key}
+              className={`h-full transition-all ${bucket.bar} ${
+                active === bucket.key ? 'opacity-100' : active === 'All' ? 'opacity-70' : 'opacity-20'
+              }`}
+              style={{ width: `${(counts[bucket.key] / issues.length) * 100}%` }}
+              title={`${bucket.key}: ${counts[bucket.key]}`}
+            />
+          ))}
         </div>
       )}
 
