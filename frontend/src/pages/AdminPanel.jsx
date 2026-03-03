@@ -105,6 +105,7 @@ export default function AdminPanel() {
   const [tab,    setTab]    = useState('jobs')
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
+  const [filterUserId, setFilterUserId] = useState('')
 
   const load = async () => {
     setLoading(true)
@@ -157,6 +158,10 @@ export default function AdminPanel() {
 
       {/* Tabs */}
       <div className="animate-slide-up" style={{ animationDelay: '120ms' }}>
+        {(() => {
+          const userMap = Object.fromEntries(users.map(u => [u.id, u.username]))
+          const filteredJobs = filterUserId ? jobs.filter(j => j.user_id === filterUserId) : jobs
+          return (<>
         <div className="flex items-center justify-between mb-4">
           <div className="flex gap-1 p-1 glass rounded-xl w-fit">
             {['jobs', 'users'].map(t => (
@@ -169,23 +174,37 @@ export default function AdminPanel() {
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                {t === 'jobs' ? `All Jobs (${jobs.length})` : `Users (${users.length})`}
+                {t === 'jobs' ? `All Jobs (${filteredJobs.length}${filterUserId ? `/${jobs.length}` : ''})` : `Users (${users.length})`}
               </button>
             ))}
           </div>
-          {tab === 'users' && (
-            <button onClick={() => setShowCreate(true)} className="btn-primary gap-2 text-sm px-4 py-2">
-              <UserPlus size={14} />
-              Create User
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {tab === 'jobs' && (
+              <select
+                value={filterUserId}
+                onChange={e => setFilterUserId(e.target.value)}
+                className="text-xs bg-slate-800 border border-white/10 text-slate-300 rounded-lg px-3 py-1.5 focus:outline-none focus:border-violet-500"
+              >
+                <option value="">All Users</option>
+                {users.filter(u => u.role !== 'admin').map(u => (
+                  <option key={u.id} value={u.id}>{u.username}</option>
+                ))}
+              </select>
+            )}
+            {tab === 'users' && (
+              <button onClick={() => setShowCreate(true)} className="btn-primary gap-2 text-sm px-4 py-2">
+                <UserPlus size={14} />
+                Create User
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Jobs table */}
         {tab === 'jobs' && (
           <div className="glass rounded-2xl overflow-hidden">
             <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 px-5 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500 border-b border-white/5">
-              <span>Job ID</span>
+              <span>Job Name / ID</span>
               <span>User</span>
               <span>Videos</span>
               <span>Issues</span>
@@ -195,18 +214,28 @@ export default function AdminPanel() {
               <div className="p-4 space-y-2">
                 {[1,2,3,4,5].map(i => <div key={i} className="skeleton h-12 rounded-xl" />)}
               </div>
-            ) : jobs.length === 0 ? (
+            ) : filteredJobs.length === 0 ? (
               <div className="text-center py-12 text-slate-500">No jobs yet</div>
             ) : (
               <div className="divide-y divide-white/5">
-                {jobs.map(job => (
+                {filteredJobs.map(job => (
                   <button
                     key={job.id}
                     onClick={() => navigate(`/jobs/${job.id}`)}
                     className="w-full grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 px-5 py-3.5 text-left hover:bg-white/[0.025] transition-colors items-center"
                   >
-                    <span className="font-mono text-xs text-slate-300">#{job.id?.slice(-10)}</span>
-                    <span className="text-xs text-slate-400 text-right">{job.user_id?.slice(-8)}</span>
+                    <div className="min-w-0">
+                      <span className="text-sm text-slate-200 truncate block">
+                        {job.job_name || `Job #${job.id?.slice(-8)}`}
+                      </span>
+                      <span className="font-mono text-xs text-slate-600">#{job.id?.slice(-10)}</span>
+                    </div>
+                    <span
+                      className="text-xs font-semibold text-cyan-400 text-right cursor-pointer hover:underline"
+                      onClick={e => { e.stopPropagation(); setFilterUserId(job.user_id === filterUserId ? '' : job.user_id) }}
+                    >
+                      {userMap[job.user_id] || job.user_id?.slice(-8)}
+                    </span>
                     <span className="text-sm font-semibold text-white text-right">{job.total_videos}</span>
                     <span className={`text-sm font-semibold text-right ${
                       (job.total_issues ?? 0) > 0 ? 'text-red-400' : 'text-emerald-400'
@@ -220,6 +249,8 @@ export default function AdminPanel() {
             )}
           </div>
         )}
+          </>)
+        })()}
 
         {/* Users table */}
         {tab === 'users' && (
@@ -245,7 +276,13 @@ export default function AdminPanel() {
                         style={{ background: 'linear-gradient(135deg,#7c3aed,#06b6d4)' }}>
                         {u.username?.[0]?.toUpperCase()}
                       </div>
-                      <span className="text-sm text-slate-200 font-medium">{u.username}</span>
+                      <button
+                        className="text-sm text-slate-200 font-medium hover:text-cyan-400 transition-colors text-left"
+                        onClick={() => { setFilterUserId(u.id); setTab('jobs') }}
+                        title="View jobs for this user"
+                      >
+                        {u.username}
+                      </button>
                     </div>
                     <span className="text-sm text-slate-400 truncate">{u.email}</span>
                     <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${

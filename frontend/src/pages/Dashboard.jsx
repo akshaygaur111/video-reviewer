@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { reviewsAPI } from '../api/client'
+import { reviewsAPI, adminAPI } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import StatusBadge from '../components/StatusBadge'
 import {
@@ -106,11 +106,11 @@ export default function Dashboard() {
 
   const fetchJobs = useCallback(async () => {
     try {
-      const res = await reviewsAPI.list()
+      const res = user?.role === 'admin' ? await adminAPI.getAllJobs() : await reviewsAPI.list()
       setJobs(res.data)
     } catch (_) {}
     finally { setLoading(false) }
-  }, [])
+  }, [user?.role])
 
   // Poll when any job is active
   useEffect(() => {
@@ -327,7 +327,7 @@ export default function Dashboard() {
       {/* Jobs list */}
       <div className="animate-slide-up" style={{ animationDelay: '180ms' }}>
         <h2 className="text-base font-bold text-white mb-3">
-          Your Review History
+          {user?.role === 'admin' ? 'All Reviews (Platform-wide)' : 'Your Review History'}
           {active > 0 && (
             <span className="ml-2 text-xs font-semibold text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded-full">
               {active} active
