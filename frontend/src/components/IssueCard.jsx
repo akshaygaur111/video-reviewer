@@ -75,35 +75,35 @@ export default function IssueCard({ issue, index }) {
          style={{ background: 'rgba(255,255,255,0.025)' }}>
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-white/[0.025] transition-colors"
+        className="w-full flex items-start gap-3 px-4 py-3.5 text-left hover:bg-white/[0.025] transition-colors"
       >
         {/* Severity dot */}
-        <span className={`w-2 h-2 rounded-full shrink-0 mt-1.5 ${sevStyle.dot}`} title={issue.severity || 'Unknown severity'} />
+        <span className={`w-2.5 h-2.5 rounded-full shrink-0 mt-1.5 ${sevStyle.dot}`} title={issue.severity || 'Unknown severity'} />
 
         {/* Timestamp */}
-        <span className={`text-xs font-mono font-bold mt-0.5 min-w-[3.2rem] ${style.text}`}>
+        <span className={`text-xs font-mono font-bold mt-0.5 min-w-[3.5rem] ${style.text}`}>
           {ts}
         </span>
 
         {/* Category badge */}
         <span className={`flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap mt-0.5 ${style.badge} ${style.label}`}>
-          <Icon size={10} />
+          <Icon size={11} />
           {issue.category || 'Issue'}
         </span>
 
         {/* Description — 2 lines visible */}
-        <span className="flex-1 text-sm text-slate-200 leading-snug line-clamp-2 text-left">
+        <span className="flex-1 text-sm text-slate-200 leading-normal line-clamp-2 text-left">
           {issue.description}
         </span>
 
         {/* Expand toggle */}
         <span className={`shrink-0 mt-0.5 ${style.text}`}>
-          {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          {open ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
         </span>
       </button>
 
       {open && (
-        <div className={`px-4 pb-4 pt-2 space-y-3 border-t ${style.border} animate-fade-in`}
+        <div className={`px-4 pb-5 pt-3 space-y-3 border-t ${style.border} animate-fade-in`}
              style={{ background: 'rgba(255,255,255,0.02)' }}>
           {/* Severity badge (expanded) */}
           {issue.severity && (
@@ -112,11 +112,11 @@ export default function IssueCard({ issue, index }) {
               {issue.severity}
             </span>
           )}
-          <p className="text-sm text-slate-200 leading-relaxed">{issue.description}</p>
+          <p className="text-base text-slate-200 leading-relaxed">{issue.description}</p>
           {issue.suggestion && (
-            <div className="flex gap-2 p-2.5 rounded-lg bg-emerald-500/8 border border-emerald-500/20">
-              <Lightbulb size={14} className="text-emerald-400 shrink-0 mt-0.5" />
-              <p className="text-xs text-emerald-300 leading-relaxed">{issue.suggestion}</p>
+            <div className="flex gap-2.5 p-3 rounded-lg bg-emerald-500/8 border border-emerald-500/20">
+              <Lightbulb size={15} className="text-emerald-400 shrink-0 mt-0.5" />
+              <p className="text-sm text-emerald-300 leading-relaxed">{issue.suggestion}</p>
             </div>
           )}
         </div>

@@ -7,6 +7,15 @@ export default {
         sans: ['Inter', 'system-ui', 'sans-serif'],
         mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
       },
+      fontSize: {
+        // Bump every step up ~1–2 px for better readability
+        xs:   ['0.8125rem', { lineHeight: '1.125rem' }],  // 13 px  (was 12)
+        sm:   ['0.9375rem', { lineHeight: '1.4rem'   }],  // 15 px  (was 14)
+        base: ['1.0625rem', { lineHeight: '1.65rem'  }],  // 17 px  (was 16)
+        lg:   ['1.1875rem', { lineHeight: '1.875rem' }],  // 19 px  (was 18)
+        xl:   ['1.3125rem', { lineHeight: '1.875rem' }],  // 21 px  (was 20)
+        '2xl':['1.5625rem', { lineHeight: '2rem'     }],  // 25 px  (was 24)
+      },
       colors: {
         dark: {
           950: '#02020f',
