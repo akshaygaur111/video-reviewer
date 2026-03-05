@@ -3,6 +3,7 @@ import os
 import uuid
 import subprocess
 import requests
+import gdown
 from typing import Optional
 
 
@@ -48,9 +49,9 @@ def get_drive_filename(url: str) -> Optional[str]:
 
 def download_from_drive(url: str) -> str:
     """
-    Download a Google Drive shared file to a unique temp path.
-    Handles both the legacy cookie-based confirmation (old Drive behaviour)
-    and the current HTML-page confirmation (new Drive behaviour for large files).
+    Download a Google Drive shared file to a unique temp path using gdown,
+    which handles all confirmation flows (small files, large-file virus-scan
+    warnings, cookie-based and HTML-page-based confirmations).
     Returns the local file path.
     """
     file_id = extract_file_id(url)
@@ -60,63 +61,13 @@ def download_from_drive(url: str) -> str:
     os.makedirs("/tmp/video_reviews", exist_ok=True)
     dest = f"/tmp/video_reviews/{uuid.uuid4()}.mp4"
 
-    session = requests.Session()
-    download_url = f"https://drive.google.com/uc?export=download&id={file_id}"
-
-    response = session.get(download_url, stream=True, timeout=60)
-
-    if response.status_code != 200:
-        raise ValueError(f"Failed to download: HTTP {response.status_code}")
-
-    content_type = response.headers.get("Content-Type", "")
-
-    if "text/html" in content_type:
-        # Google returned a confirmation page — read it and extract the real URL.
-        html = response.content.decode("utf-8", errors="replace")
-
-        # 1. Legacy: confirm token in a download_warning cookie
-        confirm_token = next(
-            (v for k, v in response.cookies.items() if k.startswith("download_warning")),
-            None,
-        )
-        if confirm_token:
-            response = session.get(
-                "https://drive.google.com/uc",
-                params={"export": "download", "id": file_id, "confirm": confirm_token},
-                stream=True,
-                timeout=120,
-            )
-        else:
-            # 2. Modern: confirmation URL is embedded in the HTML body.
-            # Matches drive.usercontent.google.com/download?... or /uc?...confirm=...
-            confirm_match = re.search(
-                r'href="(https://drive\.usercontent\.google\.com/download\?[^"]+)"', html
-            ) or re.search(
-                r'href="(/uc\?[^"]*confirm=[^"&]+[^"]*)"', html
-            )
-            if not confirm_match:
-                raise ValueError(
-                    "Google Drive returned a confirmation page but no download link could be "
-                    "extracted. Make sure the file is publicly shared ('Anyone with the link')."
-                )
-            confirm_url = confirm_match.group(1).replace("&amp;", "&")
-            if not confirm_url.startswith("http"):
-                confirm_url = "https://drive.google.com" + confirm_url
-            response = session.get(confirm_url, stream=True, timeout=120)
-
-    if response.status_code != 200:
-        raise ValueError(f"Failed to download: HTTP {response.status_code}")
-
-    with open(dest, "wb") as f:
-        for chunk in response.iter_content(chunk_size=32768):
-            if chunk:
-                f.write(chunk)
+    gdown.download(id=file_id, output=dest, quiet=False, fuzzy=False)
 
     size_bytes = os.path.getsize(dest)
     if size_bytes < 1024:
         raise ValueError(
-            f"Downloaded file is only {size_bytes} bytes — likely an HTML error page. "
-            "Check that the Drive link is publicly shared and points to a valid video file."
+            f"Downloaded file is only {size_bytes} bytes. "
+            "Check that the Drive link is publicly shared ('Anyone with the link')."
         )
 
     size_mb = size_bytes / (1024 * 1024)
