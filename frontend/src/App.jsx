@@ -6,6 +6,7 @@ import Register  from './pages/Register'
 import Dashboard from './pages/Dashboard'
 import JobDetail from './pages/JobDetail'
 import AdminPanel from './pages/AdminPanel'
+import ShareView from './pages/ShareView'
 
 function Spinner() {
   return (
@@ -48,6 +49,7 @@ export default function App() {
           <Route path="/admin" element={
             <Guard adminOnly><Shell><AdminPanel /></Shell></Guard>
           } />
+          <Route path="/share/:jobId/:videoIndex" element={<ShareView />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </BrowserRouter>

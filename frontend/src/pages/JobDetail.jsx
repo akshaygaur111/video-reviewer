@@ -326,7 +326,7 @@ export default function JobDetail() {
       {/* Video cards */}
       <div className="space-y-3">
         {(job.videos ?? []).map((video, i) => (
-          <VideoReviewCard key={i} video={video} globalIndex={i} />
+          <VideoReviewCard key={i} video={video} globalIndex={i} jobId={jobId} />
         ))}
       </div>
     </div>

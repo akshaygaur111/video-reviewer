@@ -129,3 +129,31 @@ async def get_job(job_id: str, current_user: dict = Depends(get_current_user)):
         raise
     except Exception:
         raise HTTPException(status_code=404, detail="Job not found")
+
+
+@router.get("/{job_id}/share/{video_index}")
+async def get_shared_video(job_id: str, video_index: int):
+    """Public endpoint — no auth required. Returns a single video's feedback for sharing."""
+    db = get_db()
+    try:
+        job = await db.jobs.find_one({"_id": ObjectId(job_id)})
+        if not job:
+            raise HTTPException(status_code=404, detail="Not found")
+        videos = job.get("videos", [])
+        if video_index < 0 or video_index >= len(videos):
+            raise HTTPException(status_code=404, detail="Video not found")
+        v = videos[video_index]
+        return {
+            "job_id": str(job["_id"]),
+            "job_name": job.get("job_name"),
+            "video_index": video_index,
+            "filename": v.get("filename"),
+            "drive_link": v.get("drive_link"),
+            "status": v.get("status"),
+            "combined_issues": v.get("combined_issues", []),
+            "total_issues": v.get("total_issues", 0),
+        }
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=404, detail="Not found")
