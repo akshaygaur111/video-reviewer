@@ -120,6 +120,12 @@ REVIEW DIMENSIONS — apply all of these to every video regardless of topic:
    When zooming into or focusing on a sub-part of a larger structure,
    the outer structure should remain visible and distinguished (e.g.
    highlighted border), not hidden or removed.
+   QUALITY BAR: Only flag a missing highlight when its absence causes
+   genuine confusion — e.g. the student cannot tell which of several
+   on-screen numbers the narrator is referring to, or the wrong element
+   is emphasised. Do NOT flag every sentence where a number is mentioned
+   but not highlighted; that level of flagging produces noise. Ask: would
+   a student be confused or misled without the highlight? If not, skip it.
 
 4. FACTUAL & CONTENT ACCURACY
    Verify every value, calculation, label, or statement shown on screen is
@@ -129,15 +135,20 @@ REVIEW DIMENSIONS — apply all of these to every video regardless of topic:
    - ANSWER BOX VERIFICATION (mandatory): For every result box, ordered list,
      or final answer displayed on screen, individually compare each displayed
      value against the ORIGINAL numbers stated in the problem. The displayed
-     value must be exactly equal in meaning — same fraction, same sign, same
-     magnitude. A fraction like -14/25 must NOT appear as -14 20/5, -14 2/5,
-     or any other form. A mixed number like 20 3/40 must NOT appear as 20 20/40
-     or any other incorrect equivalent. Treat any mismatch as a Critical error.
-   - FRACTION RENDERING: Verify every fraction on screen has correct numerator
-     and denominator. Check that the denominator has not been accidentally
-     replaced by a different value due to a rendering or layout error (e.g.
-     the fraction 14/25 wrongly displayed with the whole number -14 beside a
-     new fraction 20/5 is a Critical factual error, not a cosmetic one).
+     value must be mathematically equal to the original — same fraction, same
+     sign, same magnitude. A fraction like -14/25 must NOT appear as -14 20/5
+     or any mathematically different form. Treat any mathematically wrong
+     value as a Critical error.
+   - FRACTION RENDERING: Verify every fraction on screen has the correct
+     numerator and denominator. A corrupted denominator or numerator (e.g.
+     14/25 rendered as a whole number -14 beside a new fraction 20/5) is a
+     Critical factual error, not a cosmetic one.
+   - NOTATION vs FACT: Distinguish between a factual error (the displayed
+     value is mathematically DIFFERENT from the intended value — Critical) and
+     a notation/style difference (the value is mathematically EQUIVALENT but
+     written differently, e.g. "20 3/40" vs "20 and 3/40", or "1/2" vs "0.5"
+     — these are Minor at most). Do NOT classify equivalent notations as
+     Critical errors.
 
 5. LANGUAGE & TERMINOLOGY
    Concepts and terms should be introduced and referred to consistently using
@@ -209,6 +220,9 @@ REVIEW DIMENSIONS — apply all of these to every video regardless of topic:
       before the next arrives; flag sections that are rushed.
     - Transitional summaries or recaps after multi-step sequences are expected;
       flag their absence when the preceding content was complex.
+    - Do NOT flag end-of-video summary/recap screens that show all completed
+      examples together — these are a standard and intentional pedagogical
+      closure technique, not a cognitive overload problem.
 
 13. ANIMATION MATHEMATICAL ACCURACY
     Verify that every animation directly and correctly encodes the mathematics
@@ -443,6 +457,17 @@ ONE ISSUE PER DEFECT — if a single on-screen problem (e.g. wrong label text)
   touches multiple review dimensions (e.g. Factual Accuracy AND Formatting),
   file it as ONE issue under the MOST SPECIFIC applicable category. Do NOT
   duplicate the same defect under multiple categories.
+
+ISSUE QUALITY RULES — every issue must pass all of these before being filed:
+  1. DESCRIPTION must state precisely what is WRONG (specific value, element,
+     or behaviour observed on screen) and WHY it is wrong.
+  2. SUGGESTION must state a concrete, actionable fix that is DIFFERENT from
+     the description. If your description and suggestion say the same thing,
+     you have not identified a real issue — discard it.
+  3. If you cannot name the specific on-screen value or element that is wrong,
+     do not file the issue.
+  4. Do not report the same visual defect more than once. If -14/25 is wrongly
+     rendered across multiple frames, report it at the FIRST occurrence only.
 
 If there are no issues return an empty array [].
 """
