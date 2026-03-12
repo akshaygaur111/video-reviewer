@@ -497,7 +497,8 @@ def _ts_to_seconds(ts: str) -> int:
     Handles:
       "M:SS"          →  standard (e.g. "1:08")
       "MM:SS"         →  standard with leading zero (e.g. "01:08")
-      "MM:SS:mmm"     →  pass-2 millisecond bleed (e.g. "01:13:226") — ignore ms
+      "H:MM:SS"       →  transcript format (e.g. "00:01:08") — hours:mins:secs
+      "MM:SS:mmm"     →  millisecond bleed (e.g. "01:13:226") — ignore ms
       "MM:SS-MM:SS"   →  range — use start time only (e.g. "00:14-00:24")
     """
     ts = ts.strip()
@@ -507,7 +508,14 @@ def _ts_to_seconds(ts: str) -> int:
     parts = re.split(r"[^0-9]+", ts)
     parts = [p for p in parts if p]
     try:
-        if len(parts) >= 2:
+        if len(parts) >= 3:
+            # Three-part timestamp: H:MM:SS if third part <= 59, else MM:SS:mmm
+            if int(parts[2]) <= 59:
+                return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+            else:
+                # MM:SS:mmm — ignore milliseconds
+                return int(parts[0]) * 60 + int(parts[1])
+        if len(parts) == 2:
             return int(parts[0]) * 60 + int(parts[1])
     except Exception:
         pass
