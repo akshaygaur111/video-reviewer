@@ -184,18 +184,19 @@ REVIEW DIMENSIONS — apply all of these to every video regardless of topic:
 
 3. HIGHLIGHTING DISCIPLINE
    Only the element currently being discussed should be highlighted or
-   emphasised. Flag: over-highlighting, too many simultaneous highlights,
-   highlights on the wrong element, and highlights that start too early or
-   linger too long. Visual emphasis must always match narrative focus.
+   emphasised. Flag: highlights on the WRONG element, highlights that
+   linger long after the element stops being discussed, or simultaneous
+   highlights on too many elements that compete for attention.
    When zooming into or focusing on a sub-part of a larger structure,
    the outer structure should remain visible and distinguished (e.g.
    highlighted border), not hidden or removed.
-   QUALITY BAR: Only flag a missing highlight when its absence causes
-   genuine confusion — e.g. the student cannot tell which of several
-   on-screen numbers the narrator is referring to, or the wrong element
-   is emphasised. Do NOT flag every sentence where a number is mentioned
-   but not highlighted; that level of flagging produces noise. Ask: would
-   a student be confused or misled without the highlight? If not, skip it.
+   INTENTIONAL PATTERN — DO NOT FLAG: Applying a colour highlight to each
+   number as it is read aloud during the problem statement (introducing the
+   values to students) is a standard orientation technique. It is deliberate
+   and pedagogically sound. Do NOT flag this as "premature highlighting".
+   QUALITY BAR: Only flag highlighting when a student would actively be
+   confused — e.g. the wrong number is highlighted while the narrator
+   discusses a different one. Absence of highlight alone is not a defect.
 
 4. FACTUAL & CONTENT ACCURACY
    Verify every value, calculation, label, or statement shown on screen is
@@ -526,18 +527,24 @@ TRANSCRIPT (ground truth for audio):
 {checklist}
 SEVERITY CLASSIFICATION — assign exactly one severity value to every issue:
   "Critical" — Factual or mathematical errors that will directly mislead students
-               (wrong answer, wrong formula, incorrect label, calculation mistake).
-               ALSO: any spelling mistake in on-screen text — misspelled words
-               teach students incorrect language and are always Critical regardless
-               of how minor they appear visually.
-  "Major"    — Significant pedagogical or synchronisation flaws that noticeably
-               impair learning (audio-visual mismatch, wrong instructional order,
-               missing scaffolding, cognitive overload, scope gaps).
-  "Minor"    — Purely cosmetic or consistency issues that do not affect the
-               accuracy of any word, number, or concept shown on screen
-               (capitalisation of titles, punctuation style, slight pacing
-               variance, mild over-highlighting, minor terminology inconsistency).
-               NOTE: spelling errors are NEVER Minor — see Critical above.
+               (wrong answer, wrong formula, incorrect label, calculation mistake,
+               corrupted fraction or number rendering). ALSO: spelling mistakes
+               in on-screen text — always Critical, never downgraded.
+  "Major"    — Significant pedagogical flaws or timing issues that genuinely
+               impair understanding: an element appears on screen MORE THAN 3
+               SECONDS BEFORE the narrator introduces it (spoiling the reveal),
+               wrong instructional order, missing scaffolding, scope gaps, or
+               a highlight on the wrong element during active explanation.
+  "Minor"    — Small timing gaps (≤3 seconds), cosmetic inconsistencies,
+               capitalisation, punctuation, slight pacing variance, or style
+               differences that do not affect learning.
+
+  SYNC DIRECTION MATTERS:
+  - Element appears BEFORE narration (>3 sec): Major — it spoils the reveal.
+  - Element appears AFTER narration by ≤2 sec: this is normal confirmation
+    animation (narrator says it, visual confirms it). Not an issue at all.
+  - Element appears AFTER narration by 3–5 sec: Minor — noticeable but not harmful.
+  NOTE: spelling errors are NEVER Minor — see Critical above.
 
 OUTPUT: First briefly note (one line per dimension) whether each of the 12 dimensions is clean or has issues.
 Then output ONLY a JSON array of issue objects. Each element must have keys:
@@ -553,21 +560,34 @@ TIMESTAMP RULES — zero tolerance for approximation:
   - Do NOT invent a timestamp that does not appear as a start time in the
     transcript.
 
-ONE ISSUE PER DEFECT — if a single on-screen problem (e.g. wrong label text)
-  touches multiple review dimensions (e.g. Factual Accuracy AND Formatting),
-  file it as ONE issue under the MOST SPECIFIC applicable category. Do NOT
-  duplicate the same defect under multiple categories.
+ONE ISSUE PER DEFECT — if a single on-screen problem touches multiple review
+  dimensions, file it as ONE issue under the MOST SPECIFIC category.
+
+PATTERN SYNTHESIS — CRITICAL RULE:
+  If the same root-cause issue recurs at multiple timestamps, file it as
+  ONE issue, not N separate issues. List all affected timestamps inside the
+  description. Example: instead of 10 separate "answer box fills after narration"
+  issues, write ONE issue: "Throughout Example 2 and 3, answer boxes fill in
+  after the narrator confirms the value (at 2:36, 2:54, 3:00, 4:21, 4:40, 4:45,
+  4:52, 4:57). The consistent 1-2 second lag suggests an animation timing
+  setting rather than individual errors."
+  Use the timestamp of the FIRST occurrence for the issue's "timestamp" field.
+
+EXPERT QUALITY STANDARD:
+  Write like a senior educational content producer giving feedback to their team.
+  A report with 8–12 precise, actionable, well-articulated issues is far more
+  valuable than 40 mechanical observations. Before filing any issue ask:
+  "Would a producer reading this immediately understand what to fix and why
+  it matters for a student?" If the answer is no, rewrite or discard it.
+  Synthesise patterns. Explain impact on learning. Be specific about the
+  exact frame/moment. Avoid generic language like "creates a slight delay".
 
 ISSUE QUALITY RULES — every issue must pass all of these before being filed:
-  1. DESCRIPTION must state precisely what is WRONG (specific value, element,
-     or behaviour observed on screen) and WHY it is wrong.
-  2. SUGGESTION must state a concrete, actionable fix that is DIFFERENT from
-     the description. If your description and suggestion say the same thing,
-     you have not identified a real issue — discard it.
-  3. If you cannot name the specific on-screen value or element that is wrong,
-     do not file the issue.
-  4. Do not report the same visual defect more than once. If -14/25 is wrongly
-     rendered across multiple frames, report it at the FIRST occurrence only.
+  1. DESCRIPTION: name the specific element that is wrong, describe exactly
+     what it does wrong, and explain the impact on student learning.
+  2. SUGGESTION: concrete and actionable, different from description.
+  3. Do not report the same visual defect more than once across timestamps.
+  4. If your description and suggestion say the same thing, discard the issue.
 
 If there are no issues return an empty array [].
 """
@@ -593,14 +613,15 @@ You are a Senior QA Specialist with eagle-eye attention to detail.
 {base}
 
 Apply all 12 REVIEW DIMENSIONS with extra scrutiny on:
-- Subtle timing gaps (even 1–2 seconds) between audio and visual.
+- Elements appearing BEFORE the narrator introduces them (spoiling the reveal).
 - Inconsistencies in how terms, values, or labels are written vs spoken.
-- Elements appearing or disappearing at the wrong moment.
 - Steps skipped without acknowledgement.
 - Sequencing issues: does the visual order match the stated problem order?
 - Cognitive load: are too many elements visible simultaneously?
-- Any label or annotation used with an incorrect meaning.
+- Any label, annotation, or fraction rendered with incorrect values.
+- Pedagogical gaps: concepts assumed without introduction, missing scaffolding.
 
+Remember the PATTERN SYNTHESIS rule — group recurrences into one finding.
 Confidence threshold: 70%.
 """
     else:  # maximum
