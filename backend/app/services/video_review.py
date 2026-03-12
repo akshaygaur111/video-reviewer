@@ -126,6 +126,18 @@ REVIEW DIMENSIONS — apply all of these to every video regardless of topic:
    correct. Check that no wrong, partial, or intermediate results are shown
    when only the final correct value should appear. Verify any steps shown
    are logically sound and complete.
+   - ANSWER BOX VERIFICATION (mandatory): For every result box, ordered list,
+     or final answer displayed on screen, individually compare each displayed
+     value against the ORIGINAL numbers stated in the problem. The displayed
+     value must be exactly equal in meaning — same fraction, same sign, same
+     magnitude. A fraction like -14/25 must NOT appear as -14 20/5, -14 2/5,
+     or any other form. A mixed number like 20 3/40 must NOT appear as 20 20/40
+     or any other incorrect equivalent. Treat any mismatch as a Critical error.
+   - FRACTION RENDERING: Verify every fraction on screen has correct numerator
+     and denominator. Check that the denominator has not been accidentally
+     replaced by a different value due to a rendering or layout error (e.g.
+     the fraction 14/25 wrongly displayed with the whole number -14 beside a
+     new fraction 20/5 is a Critical factual error, not a cosmetic one).
 
 5. LANGUAGE & TERMINOLOGY
    Concepts and terms should be introduced and referred to consistently using
