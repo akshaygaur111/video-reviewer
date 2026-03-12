@@ -146,10 +146,11 @@ REVIEW DIMENSIONS — apply all of these to every video regardless of topic:
    Spoken language must match on-screen text — flag any discrepancy.
 
 6. TEXT & VISUAL FORMATTING
-   On-screen text must be grammatically correct, properly punctuated, and
-   consistently formatted. Check: capitalisation, punctuation in titles and
-   labels, alignment of columns or equations, readability of font sizes, and
-   that all visual elements are large enough to be clearly seen.
+   On-screen text must be spelled correctly, grammatically correct, properly
+   punctuated, and consistently formatted. Check: spelling of every word on
+   screen (misspellings are Critical errors), capitalisation, punctuation in
+   titles and labels, alignment of columns or equations, readability of font
+   sizes, and that all visual elements are large enough to be clearly seen.
 
 7. PEDAGOGICAL STRUCTURE
    Evaluate the teaching approach:
@@ -412,12 +413,17 @@ TRANSCRIPT (ground truth for audio):
 SEVERITY CLASSIFICATION — assign exactly one severity value to every issue:
   "Critical" — Factual or mathematical errors that will directly mislead students
                (wrong answer, wrong formula, incorrect label, calculation mistake).
+               ALSO: any spelling mistake in on-screen text — misspelled words
+               teach students incorrect language and are always Critical regardless
+               of how minor they appear visually.
   "Major"    — Significant pedagogical or synchronisation flaws that noticeably
                impair learning (audio-visual mismatch, wrong instructional order,
                missing scaffolding, cognitive overload, scope gaps).
-  "Minor"    — Cosmetic or consistency issues that do not fundamentally harm
-               understanding (capitalisation, punctuation, slight pacing variance,
-               mild over-highlighting, minor terminology inconsistency).
+  "Minor"    — Purely cosmetic or consistency issues that do not affect the
+               accuracy of any word, number, or concept shown on screen
+               (capitalisation of titles, punctuation style, slight pacing
+               variance, mild over-highlighting, minor terminology inconsistency).
+               NOTE: spelling errors are NEVER Minor — see Critical above.
 
 OUTPUT: First briefly note (one line per dimension) whether each of the 12 dimensions is clean or has issues.
 Then output ONLY a JSON array of issue objects. Each element must have keys:
