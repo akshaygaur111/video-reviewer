@@ -1,5 +1,10 @@
 """
-Video review service — 3-pass progressive rigor system.
+Video review service — context-first, 3-pass progressive rigor system.
+
+Context pass: Deep understanding of the video's teaching intent, correct
+              values, and intentional visual design choices. Runs before
+              any review pass and is injected into all three review prompts
+              so the model reviews with understanding, not just pattern-matching.
 
 Pass 1: Standard audit    (temperature=0.10) — always runs
 Pass 2: Enhanced scrutiny (temperature=0.05) — always runs
@@ -88,6 +93,71 @@ Extract and return a JSON object with the following keys:
     "what_is_included": "Clear statement of what the video DOES cover",
     "what_is_excluded": "Concepts deliberately left out or mentioned as out-of-scope"
   }
+}
+
+Output ONLY the JSON object. No other text.
+"""
+
+
+# ── Video context analysis prompt ─────────────────────────────────────────────
+
+VIDEO_CONTEXT_PROMPT = """
+You are an educational content analyst. Watch this video carefully and extract
+its complete teaching context BEFORE any quality review happens.
+
+Your job is NOT to find errors — it is to deeply understand what this video is
+trying to do, how it is structured, and what every correct value should be.
+This understanding will be used to guide a subsequent quality review.
+
+Return a JSON object with exactly these keys:
+
+{
+  "topic": "The precise topic covered (e.g. 'Ordering rational numbers from least to greatest')",
+
+  "learning_objective": "One sentence: what a student should be able to DO after watching",
+
+  "target_audience": "Inferred grade level and any relevant prior knowledge assumed",
+
+  "worked_examples": [
+    {
+      "example_number": 1,
+      "problem_statement": "Exact problem text as shown/spoken (e.g. 'Arrange 1, -0.5, 1/4 from least to greatest')",
+      "all_values": [
+        "Every number/fraction/decimal involved, with its correct decimal equivalent where relevant.
+         E.g.: '1', '-0.5', '1/4 = 0.25', '-14/25 = -0.56', '20 and 3/40 = 20.075'"
+      ],
+      "correct_answer": "The correct final answer in the exact form the video presents it",
+      "solution_steps": [
+        "Step-by-step description of HOW the video works through this example"
+      ]
+    }
+  ],
+
+  "visual_design_choices": [
+    "List every intentional visual design pattern you observe — things the video does
+     DELIBERATELY as part of its teaching approach. Be specific.
+     Examples:
+     - 'All answer boxes shown empty at the start of each example, filled one by one as narrator confirms each value'
+     - 'Decimal equivalents shown above original fractions before narrator states them — intentional preview technique'
+     - 'All example numbers displayed at once on introduction, not revealed one by one'
+     - 'Green highlight used exclusively to mark the number currently being placed in the answer sequence'
+     This list will be used to AVOID flagging intentional choices as defects."
+  ],
+
+  "all_correct_values": {
+    "description": "Master reference of every value that appears in the video and its correct form",
+    "values": [
+      "E.g.: '-14/25 (NOT -14 20/5)', '20 and 3/40 = 20.075 (NOT 20 20/40)', '-6/5 = -1.2'"
+    ]
+  },
+
+  "teaching_sequence": [
+    "Ordered description of the video's overall flow from start to finish, e.g.:
+     '1. Introduction: define rational numbers with examples',
+     '2. State ordering concept (least-to-greatest / greatest-to-least)',
+     '3. Example 1: mixed positive/negative — identify negative first, then compare positives',
+     ..."
+  ]
 }
 
 Output ONLY the JSON object. No other text.
@@ -272,6 +342,31 @@ def extract_json(text: str) -> List[Dict]:
     return []
 
 
+def _format_video_context_block(video_context: Dict) -> str:
+    """Build the video context block injected into every review pass prompt."""
+    import json as _json
+    ctx_json = _json.dumps(video_context, indent=2)
+    return f"""
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+VIDEO CONTEXT (extracted before this review — treat as ground truth)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{ctx_json}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+HOW TO USE THIS CONTEXT:
+1. all_correct_values is your reference for every number/fraction in the video.
+   Any on-screen value that differs from these is a factual error.
+2. visual_design_choices lists INTENTIONAL patterns. Do NOT flag these as defects.
+   Before filing a Progressive Reveal or Visual-Audio Sync issue, check whether
+   the behaviour is listed here as a deliberate design choice.
+3. worked_examples gives you the exact problem, values, and correct answer for
+   each example. Use this to verify answer boxes and final summaries.
+4. teaching_sequence describes the intended flow. Flag deviations from it, not
+   the sequence itself.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+"""
+
+
 def _format_reference_block(reference_analysis: Dict) -> str:
     """Build the reference comparison context block injected into review prompts."""
     import json as _json
@@ -361,6 +456,7 @@ def _rigor_prompt(
     include_suggestions: bool = True,
     previous_passes: Optional[List[Dict]] = None,
     reference_analysis: Optional[Dict] = None,
+    video_context: Optional[Dict] = None,
 ) -> str:
     previous_passes = previous_passes or []
 
@@ -393,6 +489,10 @@ different timestamps, and subtler defects not yet captured above.
     if reference_analysis:
         reference_block = _format_reference_block(reference_analysis)
 
+    context_block = ""
+    if video_context:
+        context_block = _format_video_context_block(video_context)
+
     checklist = """
 MANDATORY ANALYSIS METHOD — work through EVERY dimension below BEFORE writing your JSON:
   1. VISUAL-AUDIO SYNCHRONISATION  — scan every moment a new element appears or changes
@@ -421,7 +521,7 @@ VISUAL ACCURACY REQUIREMENT:
     base = f"""
 TRANSCRIPT (ground truth for audio):
 {transcript}
-{grade_block}{reference_block}{prior_block}
+{grade_block}{context_block}{reference_block}{prior_block}
 {REVIEW_DIMENSIONS}
 {checklist}
 SEVERITY CLASSIFICATION — assign exactly one severity value to every issue:
@@ -616,6 +716,7 @@ async def _run_pass(
     include_suggestions: bool = True,
     previous_passes: Optional[List[Dict]] = None,
     reference_analysis: Optional[Dict] = None,
+    video_context: Optional[Dict] = None,
 ) -> Dict:
     temperature = {"standard": 0.10, "enhanced": 0.05, "maximum": 0.01}[rigor]
     prompt = _rigor_prompt(
@@ -624,6 +725,7 @@ async def _run_pass(
         include_suggestions=include_suggestions,
         previous_passes=previous_passes or [],
         reference_analysis=reference_analysis,
+        video_context=video_context,
     )
     loop = asyncio.get_running_loop()
 
@@ -652,6 +754,55 @@ async def _run_pass(
         "issues_found": len(issues),
         "issues": issues,
     }
+
+
+async def _analyze_video_context(
+    client: genai.Client,
+    video_file,
+    job_id: str,
+    video_index: int,
+) -> Dict:
+    """
+    Context pass — runs once per video BEFORE any review passes.
+    Extracts teaching intent, correct values, and deliberate visual design
+    choices so that review passes can reason about intent, not just patterns.
+    """
+    loop = asyncio.get_running_loop()
+    print(f"[Job {job_id}] Video {video_index}: context analysis...")
+    try:
+        response = await loop.run_in_executor(
+            None,
+            lambda: client.models.generate_content(
+                model=MODEL_NAME,
+                contents=[video_file, VIDEO_CONTEXT_PROMPT],
+                config=types.GenerateContentConfig(
+                    temperature=0.05,
+                    top_p=0.95,
+                    max_output_tokens=4096,
+                ),
+            ),
+        )
+        context = {}
+        fence = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", response.text)
+        if fence:
+            try:
+                context = json.loads(fence.group(1))
+            except Exception:
+                pass
+        if not context:
+            obj = re.search(r"\{[\s\S]*\}", response.text)
+            if obj:
+                try:
+                    context = json.loads(obj.group())
+                except Exception:
+                    pass
+        if not context:
+            context = {"raw": response.text}
+        print(f"[Job {job_id}] Video {video_index}: context analysis complete.")
+        return context
+    except Exception as exc:
+        print(f"[Job {job_id}] Video {video_index}: context analysis failed ({exc}) — continuing without context.")
+        return {}
 
 
 async def _analyze_reference_video(
@@ -829,7 +980,10 @@ async def _process_single_video(
             {"$set": {f"videos.{video_index}.transcript": transcript[:6000]}},
         )
 
-        # ── 4. Three-pass review ─────────────────────────────────────────────
+        # ── 4. Context analysis pass ─────────────────────────────────────────
+        video_context = await _analyze_video_context(client, video_file, job_id, video_index)
+
+        # ── 5. Three-pass review ─────────────────────────────────────────────
         passes: List[Dict] = []
         for pass_num in range(1, 4):
             rigor = _determine_rigor(pass_num, passes)
@@ -842,6 +996,7 @@ async def _process_single_video(
                 include_suggestions=include_suggestions,
                 previous_passes=passes,   # passes accumulated so far
                 reference_analysis=reference_analysis,
+                video_context=video_context,
             )
             passes.append(result)
 
