@@ -227,6 +227,15 @@ REVIEW DIMENSIONS — apply all of these to every video regardless of topic:
    over symbols or abbreviations when introducing a concept for the first time.
    Spoken language must match on-screen text — flag any discrepancy.
 
+   SPOKEN MATHEMATICAL PHRASE ACCURACY — check every mathematical phrase
+   in the narration for completeness and correctness. Common errors to catch:
+   - "greater than equal to" → must be "greater than OR equal to"
+   - "less than equal to"    → must be "less than OR equal to"
+   - "negative positive"     → must be "negative OR positive" (when listing)
+   - dropped connectives ("and", "or", "of") that change mathematical meaning
+   These are Major issues because they model incorrect mathematical language
+   for students.
+
 6. TEXT & VISUAL FORMATTING
    On-screen text must be spelled correctly, grammatically correct, properly
    punctuated, and consistently formatted. Check: spelling of every word on
