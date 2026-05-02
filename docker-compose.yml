@@ -4,8 +4,7 @@ services:
   mongo:
     image: mongo:7
     restart: unless-stopped
-    ports:
-      - "27017:27017"
+    # Port NOT exposed to host — only reachable within docker network
     volumes:
       - mongo_data:/data/db
     environment:
@@ -16,14 +15,16 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     restart: unless-stopped
-    ports:
-      - "8000:8000"
+    # Port NOT exposed to host — frontend nginx proxies /api/ internally
     environment:
       MONGODB_URL: mongodb://mongo:27017
       DB_NAME: video_reviewer
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-in-production}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@videoiq.app}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
     depends_on:
       - mongo
 
@@ -33,7 +34,7 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "3000:80"
+      - "3000:80"   # Host nginx proxies 443 → localhost:3000
     depends_on:
       - backend
 

@@ -83,13 +83,21 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+def _cors_origins() -> list[str]:
+    """Read CORS_ORIGINS env var (comma-separated) and merge with hard-coded defaults."""
+    defaults = [
+        "https://video-reviewer-alpha.vercel.app",
+        "http://localhost:5173",
+        "http://localhost:3000",
+    ]
+    extra = os.getenv("CORS_ORIGINS", "")
+    extras = [o.strip() for o in extra.split(",") if o.strip()]
+    return list(dict.fromkeys(defaults + extras))   # deduplicate, preserve order
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://video-reviewer-alpha.vercel.app",
-        "http://localhost:5173",   # Vite dev server
-        "http://localhost:3000",
-    ],
+    allow_origins=_cors_origins(),
     allow_credentials=False,   # we use Bearer tokens, not cookies
     allow_methods=["*"],
     allow_headers=["*"],
