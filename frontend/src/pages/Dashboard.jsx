@@ -272,6 +272,7 @@ export default function Dashboard() {
                 style={{ backgroundImage: 'none' }}
               >
                 <option value="">Grade (optional)</option>
+                <option value="Pre-Kindergarten">Pre-Kindergarten</option>
                 <option value="Kindergarten">Kindergarten</option>
                 {[1,2,3,4,5,6,7,8,9,10,11,12].map(g => (
                   <option key={g} value={`Grade ${g}`}>Grade {g}</option>
